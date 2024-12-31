@@ -1,6 +1,10 @@
-use serenity::all::EditChannel;
+use serenity::all::{Colour, CreateEmbed, CreateMessage, EditChannel, Member};
 
-use crate::{util::parse_duration_to_seconds, Context, Error};
+use crate::{
+    models::moderation_log::{CreateModerationLog, ModerationAction, ModerationLog},
+    util::parse_duration_to_seconds,
+    Context, Error,
+};
 
 /// Set or remove rate limit for a channel
 ///
@@ -42,5 +46,51 @@ pub async fn slowmode(
     channel
         .edit(cx, EditChannel::new().rate_limit_per_user(cooldown))
         .await?;
+    Ok(())
+}
+
+/// Warn a user by DM them and log the warning.
+#[poise::command(
+    slash_command,
+    guild_only,
+    ephemeral,
+    default_member_permissions = "MUTE_MEMBERS"
+)]
+pub async fn warning(
+    cx: Context<'_>,
+    #[description = "The user that receives the warning"] user: Member,
+    #[description = "Reason of warning"] reason: Option<String>,
+) -> Result<(), Error> {
+    let mut conn = cx.data().database.get()?;
+    ModerationLog::create(
+        &mut conn,
+        [CreateModerationLog::new(
+            cx.guild().unwrap().id,
+            ModerationAction::Warning,
+            user.user.id,
+            Some(cx.author().id),
+            reason.clone(),
+        )],
+    )?;
+    user.user
+        .create_dm_channel(&cx)
+        .await?
+        .send_message(
+            &cx,
+            CreateMessage::new()
+                .content("You are warned by a moderator from AIHASTO.")
+                .embed(
+                    CreateEmbed::new()
+                        .color(Colour::ORANGE)
+                        .title("🔔 Warning")
+                        .description(reason.unwrap_or("No reason given.".to_string()))
+                        .fields([
+                            ("Moderator", format!("<@{}>", cx.author().id.get()), true),
+                            ("Channel", format!("<#{}>", cx.channel_id().get()), true),
+                        ]),
+                ),
+        )
+        .await?;
+    cx.say("The user has been warned.").await?;
     Ok(())
 }

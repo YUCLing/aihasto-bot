@@ -13,6 +13,7 @@ use crate::{
 #[poise::command(
     slash_command,
     ephemeral,
+    guild_only,
     subcommands("add", "remove"),
     default_member_permissions = "MANAGE_ROLES",
     required_bot_permissions = "MANAGE_ROLES"
@@ -104,6 +105,7 @@ pub async fn remove(
 #[poise::command(
     slash_command,
     ephemeral,
+    guild_only,
     rename = "temprole",
     subcommands("temp_add"),
     default_member_permissions = "MANAGE_ROLES",
