@@ -1,0 +1,18 @@
+[package]
+name = "aihasto-bot"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+chrono = "0.4.39"
+diesel = { version = "2.2.6", features = ["postgres", "r2d2", "chrono", "uuid"] }
+diesel_migrations = { version = "2.2.0", features = ["postgres"] }
+dotenvy = "0.15.7"
+fang = { version = "0.10.4" , features = ["asynk"], default-features = false }
+lazy_static = "1.5.0"
+poise = "0.6.1"
+r2d2 = "0.8.10"
+serde = { version = "1.0.217", features = ["derive"] }
+serenity = "0.12.4"
+tokio = { version = "1.42.0", features = ["rt-multi-thread"] }
+uuid = "1.11.0"

@@ -1,0 +1,133 @@
+use diesel::{query_dsl::methods::{FilterDsl, LimitDsl, SelectDsl}, ExpressionMethods, RunQueryDsl, SelectableHelper};
+use poise::CreateReply;
+use serenity::all::{Colour, CreateActionRow, CreateEmbed, CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption, EditChannel, ReactionType};
+
+use crate::{models::voice_channel::VoiceChannel, schema::voice_channels, Context, Error};
+
+async fn own_voice_channel_check(cx: Context<'_>) -> Result<bool, Error> {
+    let Some(channel) = cx.guild_channel().await else {
+        return Ok(false);
+    };
+    let mut conn = cx.data().database.get()?;
+    let results = voice_channels::table
+        .filter(voice_channels::id.eq(TryInto::<i64>::try_into(channel.id.get()).unwrap()))
+        .filter(voice_channels::creator.eq(TryInto::<i64>::try_into(cx.author().id.get()).unwrap()))
+        .limit(1)
+        .select(VoiceChannel::as_select())
+        .load(&mut conn)?;
+    if results.is_empty() {
+        cx.say("You don't own this channel").await?;
+    }
+    Ok(!results.is_empty())
+}
+
+#[poise::command(
+    slash_command,
+    ephemeral,
+    guild_only,
+    rename = "tempvoice",
+    subcommands("rename", "delete", "kick", "admin"),
+    required_bot_permissions = "MANAGE_CHANNELS|MOVE_MEMBERS",
+)]
+pub async fn temp_voice(_cx: Context<'_>) -> Result<(), Error> {
+    Ok(())
+}
+
+/// Rename your voice channel.
+#[poise::command(
+    slash_command,
+    guild_only,
+    check = "own_voice_channel_check"
+)]
+pub async fn rename(cx: Context<'_>,
+    #[description = "New name of the voice channel"]
+    #[rest]
+    name: String
+) -> Result<(), Error> {
+    let mut channel = cx.guild_channel().await.unwrap();
+    match channel.edit(&cx, EditChannel::new()
+        .name(&name)
+    ).await {
+        Ok(_) => cx.say(format!("The channel has been renamed to {}", name)).await,
+        Err(_) => cx.say("Failed to rename the channel.").await
+    }?;
+    Ok(())
+}
+
+/// Delete your voice channel.
+#[poise::command(
+    slash_command,
+    ephemeral,
+    guild_only,
+    check = "own_voice_channel_check"
+)]
+pub async fn delete(cx: Context<'_>) -> Result<(), Error> {
+    let channel = cx.guild_channel().await.unwrap();
+    channel.delete(&cx).await?;
+    Ok(())
+}
+
+/// Kick someone from your voice channel.
+#[poise::command(
+    slash_command,
+    ephemeral,
+    guild_only,
+    check = "own_voice_channel_check"
+)]
+pub async fn kick(cx: Context<'_>) -> Result<(), Error> {
+    let channel = cx.guild_channel().await.unwrap();
+    let options: Vec<CreateSelectMenuOption> = channel.members(&cx)?.iter()
+        .filter(|x| x.user.id != cx.author().id)
+        .map(|x| {
+            CreateSelectMenuOption::new(x.nick.clone().unwrap_or(x.user.display_name().to_string()), x.user.id.get().to_string())
+                .description(x.user.name.clone())
+                .emoji(ReactionType::Unicode("👤".to_string()))
+        })
+        .collect();
+    println!("{:?}", options);
+    if options.is_empty() {
+        println!("empty, return");
+        cx.say("There's no one else to be kicked.").await?;
+        return Ok(());
+    }
+    println!("continue reply");
+    let select_menu = CreateSelectMenu::new("voice_kick_user", CreateSelectMenuKind::String { options })
+        .placeholder("The user that will be kicked.");
+    let reply = CreateReply {
+        ephemeral: Some(true),
+        embeds: vec![
+            CreateEmbed::new()
+                .color(Colour::ORANGE)
+                .title("Kick a User")
+                .description("To kick a user from your voice channel, select him/her in the following menu.")
+        ],
+        components: Some(vec![
+            CreateActionRow::SelectMenu(select_menu)
+        ]),
+        ..Default::default()
+    };
+    cx.send(reply).await?;
+
+    Ok(())
+}
+
+#[poise::command(
+    slash_command,
+    ephemeral,
+    guild_only,
+    subcommands("admin_delete")
+)]
+pub async fn admin(_cx: Context<'_>) -> Result<(), Error> {
+    Ok(())
+}
+
+#[poise::command(
+    prefix_command,
+    ephemeral,
+    guild_only,
+    rename = "delete"
+)]
+pub async fn admin_delete(_cx: Context<'_>) -> Result<(), Error> {
+
+    Ok(())
+}
