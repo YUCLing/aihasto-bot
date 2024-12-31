@@ -1,4 +1,7 @@
-use std::{env, sync::{Arc, RwLock}};
+use std::{
+    env,
+    sync::{Arc, RwLock},
+};
 
 use commands::build_commands;
 use diesel::{r2d2::ConnectionManager, PgConnection};
@@ -7,7 +10,11 @@ use event_handler::Handler;
 use fang::{AsyncQueue, AsyncWorkerPool};
 use lazy_static::lazy_static;
 use r2d2::{Pool, PooledConnection};
-use serenity::{all::{Cache, CacheHttp, GatewayIntents, Http}, prelude::TypeMapKey, Client};
+use serenity::{
+    all::{Cache, CacheHttp, GatewayIntents, Http},
+    prelude::TypeMapKey,
+    Client,
+};
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
@@ -17,7 +24,7 @@ type Connection = PooledConnection<ConnManager>;
 
 struct Data {
     database: ConnectionPool,
-    queue: AsyncQueue<fang::NoTls>
+    queue: AsyncQueue<fang::NoTls>,
 }
 
 struct ConnectionPoolKey;
@@ -60,7 +67,12 @@ lazy_static! {
 }
 
 fn acquire_cache_http() -> CacheHttpHolder {
-    CACHE_HTTP.read().unwrap().as_ref().expect("Why the hell we can't get the holder?").clone()
+    CACHE_HTTP
+        .read()
+        .unwrap()
+        .as_ref()
+        .expect("Why the hell we can't get the holder?")
+        .clone()
 }
 
 #[tokio::main]
@@ -86,10 +98,11 @@ async fn main() {
 
     {
         let mut conn = pool.get().expect("Unable to get a database connection.");
-        conn.run_pending_migrations(MIGRATIONS).expect("Unable to migrate the database.");
+        conn.run_pending_migrations(MIGRATIONS)
+            .expect("Unable to migrate the database.");
     }
 
-    println!("Databse connection pool created.");
+    println!("Database connection pool created.");
 
     let mut queue = AsyncQueue::builder()
         .uri(db_url)
@@ -105,17 +118,20 @@ async fn main() {
     let framework = poise::Framework::builder()
         .setup(move |cx, _ready, framework| {
             Box::pin(async move {
-                poise::builtins::register_globally(cx, &framework.options().commands).await.expect("Unable to register commands");
+                poise::builtins::register_globally(cx, &framework.options().commands)
+                    .await
+                    .expect("Unable to register commands");
                 Ok(Data {
                     database: pool_clone,
-                    queue: queue_clone
+                    queue: queue_clone,
                 })
             })
         })
         .options(options)
         .build();
 
-    let intents = GatewayIntents::privileged() | GatewayIntents::GUILDS | GatewayIntents::GUILD_VOICE_STATES;
+    let intents =
+        GatewayIntents::privileged() | GatewayIntents::GUILDS | GatewayIntents::GUILD_VOICE_STATES;
 
     let queue_clone = queue.clone();
     let mut client = Client::builder(token, intents)

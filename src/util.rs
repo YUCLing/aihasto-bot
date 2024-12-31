@@ -1,14 +1,14 @@
 pub fn parse_duration_to_seconds<T: AsRef<str>>(duration: T) -> Result<u64, String> {
     let mut total_seconds = 0;
     let mut current_number = String::new();
-    
+
     // Iterate through each character of the input string
     for ch in duration.as_ref().chars() {
         match ch {
             '0'..='9' => {
                 // Collect digits for the current number
                 current_number.push(ch);
-            },
+            }
             's' | 'm' | 'h' => {
                 // If we encounter a time unit (s, m, or h), process the current number
                 if let Ok(value) = current_number.parse::<u64>() {
@@ -22,7 +22,7 @@ pub fn parse_duration_to_seconds<T: AsRef<str>>(duration: T) -> Result<u64, Stri
                 } else {
                     return Err("Invalid number".to_string());
                 }
-            },
+            }
             _ => return Err("Invalid character in duration string".to_string()), // Handle invalid characters
         }
     }

@@ -10,11 +10,9 @@ mod temp_voice;
 pub fn build_commands() -> Vec<Command<Data, Error>> {
     vec![
         manage::sman(),
-
         moderation::slowmode(),
         role::role(),
         role::temp_role(),
-
-        temp_voice::temp_voice()
+        temp_voice::temp_voice(),
     ]
 }
