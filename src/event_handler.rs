@@ -16,7 +16,7 @@ impl EventHandler for Handler {
     async fn ready(&self, cx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
         cx.set_presence(
-            Some(ActivityData::playing("MiSide")),
+            Some(ActivityData::playing("Catridges")),
             serenity::all::OnlineStatus::DoNotDisturb,
         );
     }
