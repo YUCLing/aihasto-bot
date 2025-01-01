@@ -57,6 +57,14 @@ diesel::table! {
 }
 
 diesel::table! {
+    guild_settings (guild, key) {
+        guild -> Int8,
+        key -> Text,
+        value -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
     use diesel::sql_types::*;
     use super::sql_types::ModerationAction;
 
@@ -85,6 +93,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     allowed_roles,
     channel_log,
     fang_tasks,
+    guild_settings,
     moderation_log,
     voice_channels,
 );
