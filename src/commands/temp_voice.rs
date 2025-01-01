@@ -95,11 +95,9 @@ pub async fn kick(cx: Context<'_>) -> Result<(), Error> {
         .collect();
     println!("{:?}", options);
     if options.is_empty() {
-        println!("empty, return");
         cx.say("There's no one else to be kicked.").await?;
         return Ok(());
     }
-    println!("continue reply");
     let select_menu =
         CreateSelectMenu::new("voice_kick_user", CreateSelectMenuKind::String { options })
             .placeholder("The user that will be kicked.");

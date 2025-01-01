@@ -10,7 +10,10 @@ use serenity::all::{
 };
 
 use crate::{
-    models::voice_channel::{CreateVoiceChannel, VoiceChannel},
+    models::{
+        guild_settings::GuildSettings,
+        voice_channel::{CreateVoiceChannel, VoiceChannel},
+    },
     schema::voice_channels,
     Connection, ConnectionPoolKey, Error,
 };
@@ -59,8 +62,12 @@ pub async fn handle_voice_state_update(cx: Context, new: VoiceState) {
     let mut conn = pool.get().unwrap();
     if let Some(channel_id) = new.channel_id {
         let guild_id = new.guild_id.unwrap();
-        if channel_id.get() == 1321337141820653632u64 {
-            // todo: configureable
+        let Some(guild_voice_creator) =
+            GuildSettings::get(&mut conn, guild_id, "creator_voice_channel")
+        else {
+            return;
+        };
+        if channel_id.get().to_string() == guild_voice_creator {
             if let Some(member) = &new.member {
                 let created_channels = voice_channels::table
                     .filter(
