@@ -1,3 +1,4 @@
+use diesel::RunQueryDsl;
 use serenity::all::{Colour, CreateEmbed, CreateMessage, EditChannel, Member};
 
 use crate::{
@@ -62,16 +63,15 @@ pub async fn warning(
     #[description = "Reason of warning"] reason: Option<String>,
 ) -> Result<(), Error> {
     let mut conn = cx.data().database.get()?;
-    ModerationLog::create(
-        &mut conn,
-        [CreateModerationLog::new(
+    ModerationLog::insert()
+        .values([CreateModerationLog::new(
             cx.guild().unwrap().id,
             ModerationAction::Warning,
             user.user.id,
             Some(cx.author().id),
             reason.clone(),
-        )],
-    )?;
+        )])
+        .execute(&mut conn)?;
     user.user
         .create_dm_channel(&cx)
         .await?

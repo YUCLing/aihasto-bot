@@ -4,17 +4,15 @@ use diesel::{
     expression::AsExpression,
     insert_into,
     prelude::{Insertable, Queryable},
+    query_builder::IncompleteInsertStatement,
     serialize::ToSql,
     sql_types::Text,
-    QueryResult, RunQueryDsl, Selectable,
+    Selectable,
 };
 use serenity::all::{GuildId, UserId};
 use uuid::Uuid;
 
-use crate::{
-    schema::{moderation_log, sql_types::ModerationAction as SqlModerationAction},
-    Connection,
-};
+use crate::schema::{moderation_log, sql_types::ModerationAction as SqlModerationAction};
 
 #[derive(Debug, AsExpression)]
 #[diesel(sql_type = SqlModerationAction)]
@@ -66,14 +64,8 @@ pub struct ModerationLog {
 }
 
 impl ModerationLog {
-    // this is kinda shit, cannot use Insertable
-    pub fn create<U: IntoIterator<Item = CreateModerationLog>>(
-        conn: &mut Connection,
-        logs: U,
-    ) -> QueryResult<usize> {
+    pub fn insert() -> IncompleteInsertStatement<moderation_log::table> {
         insert_into(moderation_log::table)
-            .values(logs.into_iter().collect::<Vec<CreateModerationLog>>())
-            .execute(conn)
     }
 }
 
