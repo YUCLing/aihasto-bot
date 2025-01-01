@@ -1,5 +1,9 @@
-use diesel::RunQueryDsl;
-use serenity::all::{Colour, CreateEmbed, CreateMessage, EditChannel, Member};
+use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
+use poise::CreateReply;
+use serenity::all::{
+    Colour, CreateEmbed, CreateEmbedFooter, CreateMessage, EditChannel, Member, User,
+};
+use uuid::Uuid;
 
 use crate::{
     models::moderation_log::{CreateModerationLog, ModerationAction, ModerationLog},
@@ -50,6 +54,58 @@ pub async fn slowmode(
     Ok(())
 }
 
+/// Inspect a user
+#[poise::command(
+    slash_command,
+    context_menu_command = "Inspect",
+    ephemeral,
+    default_member_permissions = "MUTE_MEMBERS"
+)]
+pub async fn inspect(
+    cx: Context<'_>,
+    #[description = "The user to be inspected"] user: User,
+) -> Result<(), Error> {
+    let mut conn = cx.data().database.get()?;
+    let mut warns = 0;
+    let mut floods = 0;
+    let mut timeouts = 0;
+    let mut bans = 0;
+    let logs: Vec<ModerationLog> = ModerationLog::all()
+        .filter(ModerationLog::by_user(user.clone()))
+        .order_by(crate::schema::moderation_log::created_at.desc())
+        .limit(5)
+        .load(&mut conn)?;
+    let mut embeds: Vec<CreateEmbed> = vec![];
+    for log in logs {
+        match log.kind {
+            ModerationAction::Warning => warns += 1,
+            ModerationAction::Flood => floods += 1,
+            ModerationAction::Timeout => timeouts += 1,
+            ModerationAction::Ban => bans += 1,
+        }
+        embeds.push(log.into());
+    }
+    cx.send(CreateReply {
+        content: Some(format!("Moderation logs for <@{}>", user.id.get())),
+        embeds: [
+            vec![CreateEmbed::new()
+                .title("Summary of moderations")
+                .color(Colour::BLUE)
+                .fields([
+                    ("🔔 Warning", format!("{} time(s)", warns), true),
+                    ("🔒 Flood", format!("{} time(s)", floods), true),
+                    ("🔇 Timeout", format!("{} time(s)", timeouts), true),
+                    ("🚫 Ban", format!("{} time(s)", bans), true),
+                ])],
+            embeds,
+        ]
+        .concat(),
+        ..Default::default()
+    })
+    .await?;
+    Ok(())
+}
+
 /// Warn a user by DM them and log the warning.
 #[poise::command(
     slash_command,
@@ -63,7 +119,7 @@ pub async fn warning(
     #[description = "Reason of warning"] reason: Option<String>,
 ) -> Result<(), Error> {
     let mut conn = cx.data().database.get()?;
-    ModerationLog::insert()
+    let uuid: Uuid = ModerationLog::insert()
         .values([CreateModerationLog::new(
             cx.guild().unwrap().id,
             ModerationAction::Warning,
@@ -71,7 +127,8 @@ pub async fn warning(
             Some(cx.author().id),
             reason.clone(),
         )])
-        .execute(&mut conn)?;
+        .returning(crate::schema::moderation_log::id)
+        .get_result(&mut conn)?;
     user.user
         .create_dm_channel(&cx)
         .await?
@@ -82,15 +139,21 @@ pub async fn warning(
                 .embed(
                     CreateEmbed::new()
                         .color(Colour::ORANGE)
+                        .author(cx.author().into())
                         .title("🔔 Warning")
                         .description(reason.unwrap_or("No reason given.".to_string()))
                         .fields([
                             ("Moderator", format!("<@{}>", cx.author().id.get()), true),
                             ("Channel", format!("<#{}>", cx.channel_id().get()), true),
-                        ]),
+                        ])
+                        .footer(CreateEmbedFooter::new(format!("ID: {}", uuid.to_string()))),
                 ),
         )
         .await?;
-    cx.say("The user has been warned.").await?;
+    cx.say(format!(
+        "The user has been warned.\nCase ID: `{}`",
+        uuid.to_string()
+    ))
+    .await?;
     Ok(())
 }

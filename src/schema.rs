@@ -33,6 +33,8 @@ diesel::table! {
         channel -> Int8,
         action -> ChannelAction,
         actor -> Nullable<Int8>,
+        created_at -> Timestamp,
+        updated_at -> Nullable<Timestamp>,
     }
 }
 
@@ -65,6 +67,8 @@ diesel::table! {
         member -> Int8,
         actor -> Nullable<Int8>,
         reason -> Nullable<Text>,
+        created_at -> Timestamp,
+        updated_at -> Nullable<Timestamp>,
     }
 }
 

@@ -6,5 +6,7 @@ CREATE TABLE channel_log (
     guild BIGINT NOT NULL,
     channel BIGINT NOT NULL,
     action channel_action NOT NULL,
-    actor BIGINT
+    actor BIGINT,
+    created_at TIMESTAMP NOT NULL DEFAULT current_timestamp,
+    updated_at TIMESTAMP
 );

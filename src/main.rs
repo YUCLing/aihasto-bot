@@ -43,6 +43,7 @@ type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
 mod commands;
+mod embeds;
 mod event_handler;
 mod features;
 mod models;

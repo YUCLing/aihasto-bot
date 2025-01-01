@@ -11,6 +11,7 @@ pub fn build_commands() -> Vec<Command<Data, Error>> {
     vec![
         manage::sman(),
         moderation::slowmode(),
+        moderation::inspect(),
         moderation::warning(),
         role::role(),
         role::temp_role(),

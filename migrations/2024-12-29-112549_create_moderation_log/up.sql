@@ -6,5 +6,7 @@ CREATE TABLE moderation_log (
     kind moderation_action NOT NULL,
     member BIGINT NOT NULL,
     actor BIGINT,
-    reason TEXT
+    reason TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT current_timestamp,
+    updated_at TIMESTAMP
 );

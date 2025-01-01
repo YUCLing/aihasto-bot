@@ -1,20 +1,23 @@
+use chrono::NaiveDateTime;
 use diesel::{
     backend::Backend,
-    deserialize::FromSql,
+    deserialize::{FromSql, FromSqlRow},
+    dsl::{AsSelect, SqlTypeOf},
     expression::AsExpression,
     insert_into,
+    pg::Pg,
     prelude::{Insertable, Queryable},
     query_builder::IncompleteInsertStatement,
     serialize::ToSql,
     sql_types::Text,
-    Selectable,
+    ExpressionMethods, QueryDsl, Selectable, SelectableHelper,
 };
 use serenity::all::{GuildId, UserId};
 use uuid::Uuid;
 
 use crate::schema::{moderation_log, sql_types::ModerationAction as SqlModerationAction};
 
-#[derive(Debug, AsExpression)]
+#[derive(Debug, AsExpression, FromSqlRow)]
 #[diesel(sql_type = SqlModerationAction)]
 pub enum ModerationAction {
     Warning,
@@ -55,17 +58,48 @@ impl CreateModerationLog {
 #[derive(Queryable, Selectable)]
 #[diesel(table_name = crate::schema::moderation_log)]
 pub struct ModerationLog {
-    id: Uuid,
-    guild: i64,
-    kind: ModerationAction,
-    member: i64,
-    actor: Option<i64>,
-    reason: Option<String>,
+    pub id: Uuid,
+    pub guild: i64,
+    pub kind: ModerationAction,
+    pub member: i64,
+    pub actor: Option<i64>,
+    pub reason: Option<String>,
+    pub created_at: NaiveDateTime,
+    pub updated_at: Option<NaiveDateTime>,
 }
 
 impl ModerationLog {
     pub fn insert() -> IncompleteInsertStatement<moderation_log::table> {
         insert_into(moderation_log::table)
+    }
+
+    pub fn all() -> moderation_log::BoxedQuery<'static, Pg, SqlTypeOf<AsSelect<ModerationLog, Pg>>>
+    {
+        moderation_log::table
+            .select(ModerationLog::as_select())
+            .into_boxed()
+    }
+
+    #[diesel::dsl::auto_type(no_type_alias)]
+    pub fn by_kind(kind: ModerationAction) -> _ {
+        moderation_log::kind.eq(kind)
+    }
+
+    #[diesel::dsl::auto_type(no_type_alias)]
+    pub fn by_user<U: Into<UserId>>(user: U) -> _ {
+        let id: i64 = TryInto::<i64>::try_into(user.into().get()).unwrap();
+        moderation_log::member.eq(id)
+    }
+
+    #[diesel::dsl::auto_type(no_type_alias)]
+    pub fn by_actor<U: Into<UserId>>(user: U) -> _ {
+        let id: i64 = TryInto::<i64>::try_into(user.into().get()).unwrap();
+        moderation_log::actor.eq(id)
+    }
+
+    #[diesel::dsl::auto_type(no_type_alias)]
+    pub fn no_actor() -> _ {
+        moderation_log::actor.is_null()
     }
 }
 
