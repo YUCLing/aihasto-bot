@@ -22,7 +22,12 @@ async fn own_voice_channel_check(cx: Context<'_>) -> Result<bool, Error> {
         .select(VoiceChannel::as_select())
         .load(&mut conn)?;
     if results.is_empty() {
-        cx.say("You don't own this channel").await?;
+        cx.send(CreateReply {
+            ephemeral: Some(true),
+            content: Some("You don't own this channel".to_string()),
+            ..Default::default()
+        })
+        .await?;
     }
     Ok(!results.is_empty())
 }
@@ -32,7 +37,7 @@ async fn own_voice_channel_check(cx: Context<'_>) -> Result<bool, Error> {
     ephemeral,
     guild_only,
     rename = "tempvoice",
-    subcommands("rename", "delete", "kick"),
+    subcommands("rename", "limit", "delete", "kick"),
     required_bot_permissions = "MANAGE_CHANNELS|MOVE_MEMBERS"
 )]
 pub async fn temp_voice(_cx: Context<'_>) -> Result<(), Error> {
@@ -52,6 +57,34 @@ pub async fn rename(
         Ok(_) => {
             cx.say(format!("The channel has been renamed to {}", name))
                 .await
+        }
+        Err(_) => cx.say("Failed to rename the channel.").await,
+    }?;
+    Ok(())
+}
+
+/// Set your voice channel's max user count.
+#[poise::command(slash_command, guild_only, check = "own_voice_channel_check")]
+pub async fn limit(
+    cx: Context<'_>,
+    #[description = "Max user count of the channel, ignore to remove the limit."]
+    #[max = 99]
+    #[min = 1]
+    count: Option<u32>,
+) -> Result<(), Error> {
+    let mut channel = cx.guild_channel().await.unwrap();
+    match channel
+        .edit(&cx, EditChannel::new().user_limit(count.unwrap_or(0)))
+        .await
+    {
+        Ok(_) => {
+            cx.say(format!(
+                "The user limit of the channel has been set to {}",
+                count
+                    .and_then(|x| Some(x.to_string()))
+                    .unwrap_or("unlimited".to_string())
+            ))
+            .await
         }
         Err(_) => cx.say("Failed to rename the channel.").await,
     }?;
