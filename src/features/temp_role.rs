@@ -43,15 +43,13 @@ impl RemoveTempRole {
 impl AsyncRunnable for RemoveTempRole {
     async fn run(&self, _queue: &mut dyn AsyncQueueable) -> Result<(), FangError> {
         let http = acquire_cache_http();
-        let guild_id = GuildId::new(self.guild_id);
-        let member = guild_id
-            .member(&http, UserId::new(self.user_id))
-            .await
-            .map_err(|x| FangError {
-                description: x.to_string(),
-            })?;
-        member
-            .remove_role(&http.1, RoleId::new(self.role_id))
+        http.1
+            .remove_member_role(
+                GuildId::new(self.guild_id),
+                UserId::new(self.user_id),
+                RoleId::new(self.role_id),
+                Some("Removed due to temporary role."),
+            )
             .await
             .map_err(|x| FangError {
                 description: x.to_string(),

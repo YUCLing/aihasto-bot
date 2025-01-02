@@ -65,7 +65,14 @@ pub async fn add(
         cx.say("User already has the role.").await?;
         return Ok(());
     }
-    user.add_role(&cx, role).await?;
+    cx.http()
+        .add_member_role(
+            cx.guild_id().unwrap(),
+            user.user.id,
+            role,
+            Some(format!("Given by @{} ({})", member.user.name, member.user.id).as_ref()),
+        )
+        .await?;
     cx.say(format!(
         "Gave <@{}> role <@&{}>.",
         user.user.id.get(),
@@ -92,9 +99,16 @@ pub async fn remove(
         cx.say("User doesn't have the role.").await?;
         return Ok(());
     }
-    user.remove_role(&cx, role).await?;
+    cx.http()
+        .remove_member_role(
+            cx.guild_id().unwrap(),
+            user.user.id,
+            role,
+            Some(format!("Removed by @{} ({})", member.user.name, member.user.id).as_ref()),
+        )
+        .await?;
     cx.say(format!(
-        "Revoked role <@&{}> from <@{}>.",
+        "Removed role <@&{}> from <@{}>.",
         role.get(),
         user.user.id.get()
     ))
@@ -149,10 +163,23 @@ pub async fn temp_add(
     let mut queue = cx.data().queue.clone();
     let task = RemoveTempRole::new(cx.guild_id().unwrap(), user.user.id, role, duration_secs);
     queue.insert_task(&task).await?;
-    user.add_role(&cx, role).await?;
     if duration.chars().last().map_or(false, |c| c.is_numeric()) {
         duration.push('s');
     }
+    cx.http()
+        .add_member_role(
+            cx.guild_id().unwrap(),
+            user.user.id,
+            role,
+            Some(
+                format!(
+                    "Given by @{} ({}) with a duration of {}",
+                    member.user.name, member.user.id, duration
+                )
+                .as_ref(),
+            ),
+        )
+        .await?;
     cx.say(format!(
         "Gave <@{}> role <@&{}> with a duration of **{}**.",
         user.user.id.get(),
