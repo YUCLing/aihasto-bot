@@ -16,5 +16,6 @@ pub fn build_commands() -> Vec<Command<Data, Error>> {
         role::role(),
         role::temp_role(),
         temp_voice::temp_voice(),
+        temp_voice::admin_delete(),
     ]
 }

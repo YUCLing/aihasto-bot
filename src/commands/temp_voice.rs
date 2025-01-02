@@ -1,10 +1,10 @@
 use diesel::{
-    query_dsl::methods::{FilterDsl, LimitDsl, SelectDsl},
-    ExpressionMethods, RunQueryDsl, SelectableHelper,
+    query_dsl::methods::{FilterDsl, FindDsl, LimitDsl, SelectDsl},
+    ExpressionMethods, OptionalExtension, RunQueryDsl, SelectableHelper,
 };
 use poise::CreateReply;
 use serenity::all::{
-    Colour, CreateActionRow, CreateEmbed, CreateSelectMenu, CreateSelectMenuKind,
+    ChannelId, Colour, CreateActionRow, CreateEmbed, CreateSelectMenu, CreateSelectMenuKind,
     CreateSelectMenuOption, EditChannel, ReactionType,
 };
 
@@ -32,7 +32,7 @@ async fn own_voice_channel_check(cx: Context<'_>) -> Result<bool, Error> {
     ephemeral,
     guild_only,
     rename = "tempvoice",
-    subcommands("rename", "delete", "kick", "admin"),
+    subcommands("rename", "delete", "kick"),
     required_bot_permissions = "MANAGE_CHANNELS|MOVE_MEMBERS"
 )]
 pub async fn temp_voice(_cx: Context<'_>) -> Result<(), Error> {
@@ -117,12 +117,33 @@ pub async fn kick(cx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
-#[poise::command(slash_command, ephemeral, guild_only, subcommands("admin_delete"))]
-pub async fn admin(_cx: Context<'_>) -> Result<(), Error> {
-    Ok(())
-}
-
-#[poise::command(prefix_command, ephemeral, guild_only, rename = "delete")]
-pub async fn admin_delete(_cx: Context<'_>) -> Result<(), Error> {
+/// Force delete a temporary voice channel.
+#[poise::command(
+    slash_command,
+    ephemeral,
+    guild_only,
+    rename = "delete_tempvoice_channel",
+    required_bot_permissions = "MANAGE_CHANNELS",
+    default_member_permissions = "MANAGE_CHANNELS"
+)]
+pub async fn admin_delete(
+    cx: Context<'_>,
+    #[description = "The channel to be deleted"]
+    #[channel_types("Voice")]
+    channel: ChannelId,
+) -> Result<(), Error> {
+    let mut conn = cx.data().database.get()?;
+    let id: Option<i64> = voice_channels::table
+        .find(TryInto::<i64>::try_into(channel.get()).unwrap())
+        .select(voice_channels::id)
+        .get_result(&mut conn)
+        .optional()?;
+    if id.is_none() {
+        cx.say("This voice channel is not managed by temp voice.")
+            .await?;
+        return Ok(());
+    }
+    channel.delete(&cx).await?;
+    cx.say("Channel has been deleted.").await?;
     Ok(())
 }
