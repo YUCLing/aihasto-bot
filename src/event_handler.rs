@@ -1,13 +1,17 @@
 use diesel::{delete, ExpressionMethods, RunQueryDsl};
 use serenity::{
     all::{
-        ActivityData, ChannelType, Context, EventHandler, GuildChannel, Interaction, Message,
-        Ready, VoiceState,
+        ActivityData, AuditLogEntry, ChannelType, Context, EventHandler, GuildChannel, GuildId,
+        Interaction, Message, Ready, VoiceState,
     },
     async_trait,
 };
 
-use crate::{features::temp_voice, schema::voice_channels, ConnectionPoolKey};
+use crate::{
+    data::{BotIdKey, ConnectionPoolKey},
+    features::{moderation_log, temp_voice},
+    schema::voice_channels,
+};
 
 pub struct Handler;
 
@@ -15,6 +19,10 @@ pub struct Handler;
 impl EventHandler for Handler {
     async fn ready(&self, cx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
+        cx.data
+            .write()
+            .await
+            .insert::<BotIdKey>(ready.user.id.get());
         cx.set_presence(
             Some(ActivityData::playing("Catridges")),
             serenity::all::OnlineStatus::DoNotDisturb,
@@ -42,11 +50,22 @@ impl EventHandler for Handler {
         }
     }
 
-    async fn voice_state_update(&self, cx: Context, _old: Option<VoiceState>, new: VoiceState) {
-        tokio::spawn(temp_voice::handle_voice_state_update(cx, new));
+    async fn guild_audit_log_entry_create(
+        &self,
+        cx: Context,
+        entry: AuditLogEntry,
+        guild_id: GuildId,
+    ) {
+        tokio::spawn(moderation_log::guild_audit_log_entry_create(
+            cx, entry, guild_id,
+        ));
     }
 
     async fn interaction_create(&self, cx: Context, interaction: Interaction) {
         tokio::spawn(temp_voice::handle_interaction(cx, interaction));
+    }
+
+    async fn voice_state_update(&self, cx: Context, _old: Option<VoiceState>, new: VoiceState) {
+        tokio::spawn(temp_voice::handle_voice_state_update(cx, new));
     }
 }

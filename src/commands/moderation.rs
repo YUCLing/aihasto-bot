@@ -1,13 +1,15 @@
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
 use poise::CreateReply;
 use serenity::all::{
-    Colour, CreateEmbed, CreateEmbedFooter, CreateMessage, EditChannel, Member, User,
+    ChannelId, Colour, CreateEmbed, CreateEmbedFooter, CreateMessage, EditChannel, Member, User,
 };
-use uuid::Uuid;
 
 use crate::{
-    models::moderation_log::{CreateModerationLog, ModerationAction, ModerationLog},
-    util::parse_duration_to_seconds,
+    models::{
+        guild_settings::GuildSettings,
+        moderation_log::{CreateModerationLog, ModerationAction, ModerationLog},
+    },
+    util::{parse_duration_to_seconds, send_moderation_logs},
     Context, Error,
 };
 
@@ -119,16 +121,17 @@ pub async fn warning(
     #[description = "Reason of warning"] reason: Option<String>,
 ) -> Result<(), Error> {
     let mut conn = cx.data().database.get()?;
-    let uuid: Uuid = ModerationLog::insert()
+    let guild_id = cx.guild().unwrap().id;
+    let log: ModerationLog = ModerationLog::insert()
         .values([CreateModerationLog::new(
-            cx.guild().unwrap().id,
+            guild_id,
             ModerationAction::Warning,
             user.user.id,
             Some(cx.author().id),
             reason.clone(),
         )])
-        .returning(crate::schema::moderation_log::id)
         .get_result(&mut conn)?;
+    let uuid = log.id;
     user.user
         .create_dm_channel(&cx)
         .await?
@@ -155,5 +158,8 @@ pub async fn warning(
         uuid.to_string()
     ))
     .await?;
+    if let Some(channel) = GuildSettings::get(&mut conn, guild_id, "moderation_log_channel") {
+        send_moderation_logs(&cx, ChannelId::new(channel.parse().unwrap()), [log]).await?;
+    }
     Ok(())
 }

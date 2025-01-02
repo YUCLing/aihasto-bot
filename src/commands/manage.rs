@@ -10,7 +10,11 @@ use crate::{
 #[poise::command(
     slash_command,
     guild_only,
-    subcommands("sman_tempvoice", "sman_allowed_roles"),
+    subcommands(
+        "sman_tempvoice",
+        "sman_set_moderation_log_channel",
+        "sman_allowed_roles"
+    ),
     required_permissions = "ADMINISTRATOR"
 )]
 pub async fn sman(_cx: Context<'_>) -> Result<(), Error> {
@@ -52,6 +56,41 @@ pub async fn sman_tempvoice_set_channel(
     } else {
         GuildSettings::set(&mut conn, guild, "creator_voice_channel", None::<String>)?;
         cx.say("The temporary voice channel creation has been disabled.")
+            .await?;
+    }
+    Ok(())
+}
+
+/// Set the moderation log channel.
+#[poise::command(
+    slash_command,
+    guild_only,
+    ephemeral,
+    rename = "set_moderation_log_channel"
+)]
+pub async fn sman_set_moderation_log_channel(
+    cx: Context<'_>,
+    #[description = "The channel that will be the moderation log channel, ignore to disable"]
+    #[channel_types("Text")]
+    channel: Option<ChannelId>,
+) -> Result<(), Error> {
+    let guild = cx.guild_id().unwrap();
+    let mut conn = cx.data().database.get()?;
+    if let Some(channel) = channel {
+        GuildSettings::set(
+            &mut conn,
+            guild,
+            "moderation_log_channel",
+            Some(channel.get().to_string()),
+        )?;
+        cx.say(format!(
+            "The moderation log channel has been set to <#{}>",
+            channel.get()
+        ))
+        .await?;
+    } else {
+        GuildSettings::set(&mut conn, guild, "moderation_log_channel", None::<String>)?;
+        cx.say("The moderation log channel creation has been disabled.")
             .await?;
     }
     Ok(())

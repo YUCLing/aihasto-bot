@@ -1,20 +1,14 @@
-use std::{
-    env,
-    sync::{Arc, RwLock},
-};
+use std::{env, sync::RwLock};
 
 use commands::build_commands;
+use data::{CacheHttpHolder, ConnectionPoolKey, Data, QueueKey};
 use diesel::{r2d2::ConnectionManager, PgConnection};
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use event_handler::Handler;
 use fang::{AsyncQueue, AsyncWorkerPool};
 use lazy_static::lazy_static;
 use r2d2::{Pool, PooledConnection};
-use serenity::{
-    all::{Cache, CacheHttp, GatewayIntents, Http},
-    prelude::TypeMapKey,
-    Client,
-};
+use serenity::{all::GatewayIntents, Client};
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
@@ -22,46 +16,17 @@ type ConnManager = ConnectionManager<PgConnection>;
 type ConnectionPool = Pool<ConnManager>;
 type Connection = PooledConnection<ConnManager>;
 
-struct Data {
-    database: ConnectionPool,
-    queue: AsyncQueue<fang::NoTls>,
-}
-
-struct ConnectionPoolKey;
-
-impl TypeMapKey for ConnectionPoolKey {
-    type Value = ConnectionPool;
-}
-
-struct QueueKey;
-
-impl TypeMapKey for QueueKey {
-    type Value = AsyncQueue<fang::NoTls>;
-}
-
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
 mod commands;
+mod data;
 mod embeds;
 mod event_handler;
 mod features;
 mod models;
 mod schema;
 mod util;
-
-#[derive(Clone)]
-struct CacheHttpHolder(Arc<Cache>, Arc<Http>);
-
-impl CacheHttp for CacheHttpHolder {
-    fn http(&self) -> &Http {
-        &self.1
-    }
-
-    fn cache(&self) -> Option<&Arc<Cache>> {
-        Some(&self.0)
-    }
-}
 
 lazy_static! {
     static ref CACHE_HTTP: RwLock<Option<CacheHttpHolder>> = RwLock::new(None);
@@ -131,8 +96,10 @@ async fn main() {
         .options(options)
         .build();
 
-    let intents =
-        GatewayIntents::privileged() | GatewayIntents::GUILDS | GatewayIntents::GUILD_VOICE_STATES;
+    let intents = GatewayIntents::privileged()
+        | GatewayIntents::GUILDS
+        | GatewayIntents::GUILD_VOICE_STATES
+        | GatewayIntents::GUILD_MODERATION;
 
     let queue_clone = queue.clone();
     let mut client = Client::builder(token, intents)

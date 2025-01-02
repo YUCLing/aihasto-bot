@@ -1,6 +1,6 @@
 use poise::Command;
 
-use crate::{Data, Error};
+use crate::{data::Data, Error};
 
 mod manage;
 mod moderation;

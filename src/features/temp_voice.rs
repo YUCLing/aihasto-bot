@@ -10,12 +10,13 @@ use serenity::all::{
 };
 
 use crate::{
+    data::ConnectionPoolKey,
     models::{
         guild_settings::GuildSettings,
         voice_channel::{CreateVoiceChannel, VoiceChannel},
     },
     schema::voice_channels,
-    Connection, ConnectionPoolKey, Error,
+    Connection, Error,
 };
 
 pub fn default_channel_name_for_member(member: &Member) -> String {
