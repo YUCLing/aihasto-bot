@@ -15,7 +15,7 @@ use crate::{
         "sman_set_moderation_log_channel",
         "sman_allowed_roles"
     ),
-    required_permissions = "ADMINISTRATOR"
+    default_member_permissions = "ADMINISTRATOR"
 )]
 pub async fn sman(_cx: Context<'_>) -> Result<(), Error> {
     Ok(())
