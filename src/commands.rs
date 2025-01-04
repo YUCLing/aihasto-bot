@@ -14,6 +14,7 @@ pub fn build_commands() -> Vec<Command<Data, Error>> {
         moderation::inspect(),
         moderation::warning(),
         moderation::flood(),
+        moderation::reason(),
         role::role(),
         role::temp_role(),
         temp_voice::temp_voice(),

@@ -1,7 +1,14 @@
-use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
+use std::str::FromStr;
+
+use diesel::{
+    update, ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl, SelectableHelper,
+};
 use fang::AsyncQueueable;
 use poise::CreateReply;
-use serenity::all::{ChannelId, Colour, CreateEmbed, EditChannel, Member, RoleId, User};
+use serenity::all::{
+    ChannelId, Colour, CreateEmbed, CreateMessage, EditChannel, Member, RoleId, User,
+};
+use uuid::Uuid;
 
 use crate::{
     features::{moderation_dm::generate_dm_message, temp_role::RemoveTempRole},
@@ -245,5 +252,49 @@ pub async fn flood(
     if let Some(channel) = GuildSettings::get(&mut conn, guild_id, "moderation_log_channel") {
         send_moderation_logs(&cx, ChannelId::new(channel.parse().unwrap()), [log]).await?;
     }
+    Ok(())
+}
+
+/// Update the reason of a case.
+#[poise::command(
+    slash_command,
+    guild_only,
+    ephemeral,
+    default_member_permissions = "MUTE_MEMBERS"
+)]
+pub async fn reason(
+    cx: Context<'_>,
+    #[description = "ID of the case to be updated"]
+    #[rename = "id"]
+    case_id: String,
+    #[description = "New reason"]
+    #[rename = "reason"]
+    new_reason: String,
+) -> Result<(), Error> {
+    use crate::schema::moderation_log::*;
+    let mut conn = cx.data().database.get()?;
+    let Some(log) = update(table)
+        .filter(id.eq(Uuid::from_str(&case_id).map_err(|_| "Case ID is invalid.")?))
+        .set((reason.eq(new_reason), updated_at.eq(diesel::dsl::now)))
+        .returning(ModerationLog::as_returning())
+        .get_result(&mut conn)
+        .optional()?
+    else {
+        cx.say("No case with provided ID found.").await?;
+        return Ok(());
+    };
+    if let Some(channel) =
+        GuildSettings::get(&mut conn, cx.guild_id().unwrap(), "moderation_log_channel")
+    {
+        ChannelId::new(channel.parse().unwrap())
+            .send_message(
+                &cx,
+                CreateMessage::new()
+                    .content("A case has been updated.")
+                    .embed(log.into()),
+            )
+            .await?;
+    }
+    cx.say("Case has been updated.").await?;
     Ok(())
 }
