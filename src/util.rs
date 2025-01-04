@@ -13,13 +13,15 @@ pub fn parse_duration_to_seconds<T: AsRef<str>>(duration: T) -> Result<u64, Stri
                 // Collect digits for the current number
                 current_number.push(ch);
             }
-            's' | 'm' | 'h' => {
+            's' | 'm' | 'h' | 'd' | 'w' => {
                 // If we encounter a time unit (s, m, or h), process the current number
                 if let Ok(value) = current_number.parse::<u64>() {
                     match ch {
                         's' => total_seconds += value,
                         'm' => total_seconds += value * 60,
                         'h' => total_seconds += value * 3600,
+                        'd' => total_seconds += value * 86400,
+                        'w' => total_seconds += value * 604800,
                         _ => return Err(format!("Unsupported unit: {}", ch)),
                     }
                     current_number.clear(); // Reset the current number for the next part
