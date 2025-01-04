@@ -1,10 +1,10 @@
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
+use fang::AsyncQueueable;
 use poise::CreateReply;
-use serenity::all::{
-    ChannelId, Colour, CreateEmbed, CreateEmbedFooter, CreateMessage, EditChannel, Member, User,
-};
+use serenity::all::{ChannelId, Colour, CreateEmbed, EditChannel, Member, RoleId, User};
 
 use crate::{
+    features::{moderation_dm::generate_dm_message, temp_role::RemoveTempRole},
     models::{
         guild_settings::GuildSettings,
         moderation_log::{CreateModerationLog, ModerationAction, ModerationLog},
@@ -94,10 +94,26 @@ pub async fn inspect(
                 .title("Summary of moderations")
                 .color(Colour::BLUE)
                 .fields([
-                    ("🔔 Warning", format!("{} time(s)", warns), true),
-                    ("🔒 Flood", format!("{} time(s)", floods), true),
-                    ("🔇 Timeout", format!("{} time(s)", timeouts), true),
-                    ("🚫 Ban", format!("{} time(s)", bans), true),
+                    (
+                        ModerationAction::Warning.embed_title(),
+                        format!("{} time(s)", warns),
+                        true,
+                    ),
+                    (
+                        ModerationAction::Flood.embed_title(),
+                        format!("{} time(s)", floods),
+                        true,
+                    ),
+                    (
+                        ModerationAction::Timeout.embed_title(),
+                        format!("{} time(s)", timeouts),
+                        true,
+                    ),
+                    (
+                        ModerationAction::Ban.embed_title(),
+                        format!("{} time(s)", bans),
+                        true,
+                    ),
                 ])],
             embeds,
         ]
@@ -108,7 +124,7 @@ pub async fn inspect(
     Ok(())
 }
 
-/// Warn a user by DM them and log the warning.
+/// Warn a user. Use in the channel where the user violates the rules.
 #[poise::command(
     slash_command,
     guild_only,
@@ -133,29 +149,97 @@ pub async fn warning(
         .get_result(&mut conn)?;
     let uuid = log.id;
     user.user
-        .create_dm_channel(&cx)
-        .await?
-        .send_message(
+        .dm(
             &cx,
-            CreateMessage::new()
-                .content("You are warned by a moderator from AIHASTO.")
-                .embed(
-                    CreateEmbed::new()
-                        .color(Colour::ORANGE)
-                        .author(cx.author().into())
-                        .title("🔔 Warning")
-                        .description(reason.unwrap_or("No reason given.".to_string()))
-                        .fields([
-                            ("Moderator", format!("<@{}>", cx.author().id.get()), true),
-                            ("Channel", format!("<#{}>", cx.channel_id().get()), true),
-                        ])
-                        .footer(CreateEmbedFooter::new(format!("ID: {}", uuid.to_string()))),
-                ),
+            generate_dm_message(&log, cx.author(), Some(cx.channel_id())),
         )
         .await?;
     cx.say(format!(
         "The user has been warned.\nCase ID: `{}`",
         uuid.to_string()
+    ))
+    .await?;
+    if let Some(channel) = GuildSettings::get(&mut conn, guild_id, "moderation_log_channel") {
+        send_moderation_logs(&cx, ChannelId::new(channel.parse().unwrap()), [log]).await?;
+    }
+    Ok(())
+}
+
+/// Make a user Flooder. Use in the channel where the user violates the rules.
+#[poise::command(slash_command, ephemeral, default_member_permissions = "MUTE_MEMBERS")]
+pub async fn flood(
+    cx: Context<'_>,
+    #[description = "User that gets the Flooder"] user: Member,
+    #[description = "The duration that user will be the Flooder"] mut duration: String,
+    #[description = "Reason of making the user a Flooder"] reason: Option<String>,
+) -> Result<(), Error> {
+    let duration_secs = match parse_duration_to_seconds(&duration)
+        .and_then(|x| x.try_into().map_err(|_| "Invalid number".to_string()))
+    {
+        Ok(x) => x,
+        Err(err) => {
+            cx.say(err).await?;
+            return Ok(());
+        }
+    };
+    if duration_secs <= 0 {
+        cx.say("Invalid duration").await?;
+        return Ok(());
+    }
+    let guild_id = cx.guild_id().unwrap();
+    let mut conn = cx.data().database.get()?;
+    let Some(flooder_role) = GuildSettings::get(&mut conn, guild_id, "flooder_role")
+        .and_then(|x| Some(RoleId::new(x.parse().unwrap())))
+    else {
+        cx.say("Flooder is disabled.").await?;
+        return Ok(());
+    };
+    if user.roles.contains(&flooder_role) {
+        cx.say("User is already a Flooder.").await?;
+        return Ok(());
+    }
+    let queue = cx.data().queue.clone();
+    let task = RemoveTempRole::new(guild_id, user.user.id, flooder_role, duration_secs);
+    queue.schedule_task(&task).await?;
+    if duration.chars().last().map_or(false, |c| c.is_numeric()) {
+        duration.push('s');
+    }
+    let member = cx.author_member().await.unwrap();
+    cx.http()
+        .add_member_role(
+            guild_id,
+            user.user.id,
+            flooder_role,
+            Some(
+                format!(
+                    "Flooded by @{} ({}) with a duration of {}",
+                    member.user.name, member.user.id, duration
+                )
+                .as_ref(),
+            ),
+        )
+        .await?;
+    let log: ModerationLog = ModerationLog::insert()
+        .values([CreateModerationLog::new(
+            guild_id,
+            ModerationAction::Flood,
+            user.user.id,
+            Some(cx.author().id),
+            reason.clone(),
+        )])
+        .get_result(&mut conn)?;
+    let uuid = log.id;
+    user.user
+        .dm(
+            &cx,
+            generate_dm_message(&log, cx.author(), Some(cx.channel_id())),
+        )
+        .await?;
+    cx.say(format!(
+        "Made <@{}> Flooder with a duration of **{}**.\nCase ID: `{}`",
+        user.user.id.get(),
+        duration,
+        uuid
     ))
     .await?;
     if let Some(channel) = GuildSettings::get(&mut conn, guild_id, "moderation_log_channel") {

@@ -12,7 +12,7 @@ use diesel::{
     sql_types::Text,
     ExpressionMethods, QueryDsl, Selectable, SelectableHelper,
 };
-use serenity::all::{GuildId, UserId};
+use serenity::all::{Colour, CreateEmbed, GuildId, UserId};
 use uuid::Uuid;
 
 use crate::schema::{moderation_log, sql_types::ModerationAction as SqlModerationAction};
@@ -24,6 +24,32 @@ pub enum ModerationAction {
     Flood,
     Timeout,
     Ban,
+}
+
+impl ModerationAction {
+    pub fn embed_title(&self) -> &str {
+        match self {
+            Self::Warning => "🔔 Warning",
+            Self::Flood => "🔒 Flood",
+            Self::Timeout => "🔇 Timeout",
+            Self::Ban => "🚫 Ban",
+        }
+    }
+
+    pub fn embed_color(&self) -> Colour {
+        match self {
+            Self::Warning => Colour::ORANGE,
+            Self::Flood => Colour::LIGHT_GREY,
+            Self::Timeout => Colour::PURPLE,
+            Self::Ban => Colour::RED,
+        }
+    }
+
+    pub fn create_embed(&self) -> CreateEmbed {
+        CreateEmbed::new()
+            .color(self.embed_color())
+            .title(self.embed_title())
+    }
 }
 
 #[derive(Insertable)]

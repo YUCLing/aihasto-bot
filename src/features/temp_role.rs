@@ -41,7 +41,7 @@ impl RemoveTempRole {
 #[typetag::serde]
 #[async_trait]
 impl AsyncRunnable for RemoveTempRole {
-    async fn run(&self, _queue: &mut dyn AsyncQueueable) -> Result<(), FangError> {
+    async fn run(&self, _queue: &dyn AsyncQueueable) -> Result<(), FangError> {
         let http = acquire_cache_http();
         http.1
             .remove_member_role(

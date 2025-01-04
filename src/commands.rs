@@ -13,6 +13,7 @@ pub fn build_commands() -> Vec<Command<Data, Error>> {
         moderation::slowmode(),
         moderation::inspect(),
         moderation::warning(),
+        moderation::flood(),
         role::role(),
         role::temp_role(),
         temp_voice::temp_voice(),

@@ -10,7 +10,7 @@ use crate::ConnectionPool;
 
 pub struct Data {
     pub(crate) database: ConnectionPool,
-    pub(crate) queue: AsyncQueue<fang::NoTls>,
+    pub(crate) queue: AsyncQueue,
 }
 
 pub struct ConnectionPoolKey;
@@ -22,7 +22,7 @@ impl TypeMapKey for ConnectionPoolKey {
 pub struct QueueKey;
 
 impl TypeMapKey for QueueKey {
-    type Value = AsyncQueue<fang::NoTls>;
+    type Value = AsyncQueue;
 }
 
 pub struct BotIdKey;

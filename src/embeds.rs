@@ -1,10 +1,12 @@
-use serenity::all::{Colour, CreateEmbed, CreateEmbedFooter};
+use serenity::all::{CreateEmbed, CreateEmbedFooter};
 
-use crate::models::moderation_log::{ModerationAction, ModerationLog};
+use crate::models::moderation_log::ModerationLog;
 
 impl From<ModerationLog> for CreateEmbed {
     fn from(value: ModerationLog) -> Self {
-        let mut embed = CreateEmbed::new()
+        let mut embed = value
+            .kind
+            .create_embed()
             .description(value.reason.unwrap_or("No reason given.".to_string()))
             .field("User", format!("<@{}>", value.member), true)
             .footer(CreateEmbedFooter::new(format!(
@@ -30,20 +32,6 @@ impl From<ModerationLog> for CreateEmbed {
                 true,
             ),
         ]);
-        match value.kind {
-            ModerationAction::Warning => {
-                embed = embed.color(Colour::ORANGE).title("🔔 Warning");
-            }
-            ModerationAction::Flood => {
-                embed = embed.color(Colour::LIGHT_GREY).title("🔒 Flood");
-            }
-            ModerationAction::Timeout => {
-                embed = embed.color(Colour::PURPLE).title("🔇 Timeout");
-            }
-            ModerationAction::Ban => {
-                embed = embed.color(Colour::RED).title("🚫 Ban");
-            }
-        };
         embed
     }
 }

@@ -160,9 +160,9 @@ pub async fn temp_add(
         cx.say("User already has the role.").await?;
         return Ok(());
     }
-    let mut queue = cx.data().queue.clone();
+    let queue = cx.data().queue.clone();
     let task = RemoveTempRole::new(cx.guild_id().unwrap(), user.user.id, role, duration_secs);
-    queue.insert_task(&task).await?;
+    queue.schedule_task(&task).await?;
     if duration.chars().last().map_or(false, |c| c.is_numeric()) {
         duration.push('s');
     }

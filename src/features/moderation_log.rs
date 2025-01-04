@@ -12,6 +12,8 @@ use crate::{
     util::send_moderation_logs,
 };
 
+use super::moderation_dm::generate_dm_message;
+
 pub async fn guild_audit_log_entry_create(cx: Context, entry: AuditLogEntry, guild_id: GuildId) {
     match entry.action {
         Action::Member(MemberAction::Update) => {
@@ -42,15 +44,26 @@ pub async fn guild_audit_log_entry_create(cx: Context, entry: AuditLogEntry, gui
                                     )])
                                     .get_results(&mut conn)
                                     .expect("Unable to log timeout.");
+                                let target = UserId::new(entry.target_id.unwrap().get());
+                                if let Ok(moderator) = entry.user_id.to_user(&cx).await {
+                                    let _ = target
+                                        .dm(
+                                            &cx,
+                                            generate_dm_message(
+                                                logs.get(0).as_ref().unwrap(),
+                                                &moderator,
+                                                None::<ChannelId>,
+                                            ),
+                                        )
+                                        .await;
+                                }
                                 if let Some(channel) = GuildSettings::get(
                                     &mut conn,
                                     guild_id,
-                                    "set_moderation_log_channel",
+                                    "moderation_log_channel",
                                 ) {
                                     let channel = ChannelId::new(channel.parse().unwrap());
-                                    send_moderation_logs(&cx, channel, logs)
-                                        .await
-                                        .expect("Unable to send moderation logs.");
+                                    let _ = send_moderation_logs(&cx, channel, logs).await;
                                 }
                             });
                         }
@@ -79,8 +92,7 @@ pub async fn guild_audit_log_entry_create(cx: Context, entry: AuditLogEntry, gui
                 )])
                 .get_results(&mut conn)
                 .expect("Unable to log ban.");
-            if let Some(channel) =
-                GuildSettings::get(&mut conn, guild_id, "set_moderation_log_channel")
+            if let Some(channel) = GuildSettings::get(&mut conn, guild_id, "moderation_log_channel")
             {
                 let channel = ChannelId::new(channel.parse().unwrap());
                 send_moderation_logs(&cx, channel, logs)

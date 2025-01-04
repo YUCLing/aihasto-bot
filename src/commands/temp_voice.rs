@@ -126,7 +126,6 @@ pub async fn kick(cx: Context<'_>) -> Result<(), Error> {
             .emoji(ReactionType::Unicode("👤".to_string()))
         })
         .collect();
-    println!("{:?}", options);
     if options.is_empty() {
         cx.say("There's no one else to be kicked.").await?;
         return Ok(());

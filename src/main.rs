@@ -75,7 +75,7 @@ async fn main() {
         .max_pool_size(4u32)
         .build();
 
-    queue.connect(fang::NoTls).await.unwrap();
+    queue.connect().await.unwrap();
 
     println!("Queue created.");
 
@@ -116,7 +116,7 @@ async fn main() {
     }
 
     println!("Starting queue workers...");
-    let mut pool: AsyncWorkerPool<AsyncQueue<fang::NoTls>> = AsyncWorkerPool::builder()
+    let mut pool: AsyncWorkerPool<AsyncQueue> = AsyncWorkerPool::builder()
         .number_of_workers(4u32)
         .queue(queue)
         .build();
