@@ -1,0 +1,22 @@
+services:
+  app:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    volumes:
+      - ../.env:/usr/bot/.env:ro
+    environment:
+      - DATABASE_URL=postgresql://postgres:${DB_PASSWORD:-postgres}@postgres:5432/postgres
+    networks:
+      - default
+  postgres:
+    image: postgres:17.2-alpine3.21
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data:rw
+    environment:
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
+    networks:
+      - default
+networks:
+  default:
