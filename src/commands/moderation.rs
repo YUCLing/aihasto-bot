@@ -86,21 +86,30 @@ pub async fn inspect(
     let mut floods = 0;
     let mut timeouts = 0;
     let mut bans = 0;
-    let logs: Vec<ModerationLog> = ModerationLog::all()
+    for result in {
+        use diesel::dsl::*;
+        use crate::schema::moderation_log::*;
+        table
+            .filter(ModerationLog::by_user(user.clone()))
+            .group_by(kind)
+            .select((kind, count_star()))
+            .load::<(ModerationAction, i64)>(&mut conn)?
+    } {
+        match result.0 {
+            ModerationAction::Warning => warns = result.1,
+            ModerationAction::Flood => floods = result.1,
+            ModerationAction::Timeout => timeouts = result.1,
+            ModerationAction::Ban => bans = result.1,
+        }
+    }
+    let logs: Vec<CreateEmbed> = ModerationLog::all()
         .filter(ModerationLog::by_user(user.clone()))
         .order_by(crate::schema::moderation_log::created_at.desc())
         .limit(5)
-        .load(&mut conn)?;
-    let mut embeds: Vec<CreateEmbed> = vec![];
-    for log in logs {
-        match log.kind {
-            ModerationAction::Warning => warns += 1,
-            ModerationAction::Flood => floods += 1,
-            ModerationAction::Timeout => timeouts += 1,
-            ModerationAction::Ban => bans += 1,
-        }
-        embeds.push(log.into());
-    }
+        .load::<ModerationLog>(&mut conn)?
+        .into_iter()
+        .map(|x| x.into())
+        .collect();
     cx.send(CreateReply {
         content: Some(format!("Moderation logs for <@{}>", user.id.get())),
         embeds: [
@@ -129,7 +138,7 @@ pub async fn inspect(
                         true,
                     ),
                 ])],
-            embeds,
+            logs,
         ]
         .concat(),
         ..Default::default()
