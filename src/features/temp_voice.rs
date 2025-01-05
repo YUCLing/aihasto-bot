@@ -6,7 +6,7 @@ use diesel::{
 use serenity::all::{
     CacheHttp, ChannelId, ComponentInteractionDataKind, Context, CreateChannel,
     CreateInteractionResponse, CreateInteractionResponseFollowup, CreateInteractionResponseMessage,
-    CreateMessage, GuildChannel, GuildId, Interaction, Member, UserId, VoiceState,
+    CreateMessage, EditMember, GuildChannel, GuildId, Interaction, Member, User, VoiceState,
 };
 
 use crate::{
@@ -26,21 +26,18 @@ pub fn default_channel_name_for_member(member: &Member) -> String {
         .unwrap_or(member.user.display_name().to_string())
 }
 
-pub async fn create_temp_voice_channel<
-    U: CacheHttp,
-    V: Into<GuildId>,
-    W: Into<UserId>,
-    X: AsRef<str>,
->(
+pub async fn create_temp_voice_channel<U: CacheHttp, V: Into<GuildId>, W: AsRef<str>>(
     conn: &mut Connection,
     http: &U,
     guild: V,
-    creator: W,
-    name: X,
+    creator: &User,
+    name: W,
     category: Option<ChannelId>,
 ) -> Result<GuildChannel, Error> {
-    let mut create_channel =
-        CreateChannel::new(name.as_ref().to_string()).kind(serenity::all::ChannelType::Voice);
+    let reason = format!("Created by @{} ({})", creator.name, creator.id.get());
+    let mut create_channel = CreateChannel::new(name.as_ref().to_string())
+        .kind(serenity::all::ChannelType::Voice)
+        .audit_log_reason(&reason);
     if let Some(category) = category {
         create_channel = create_channel.category(category);
     }
@@ -92,7 +89,7 @@ pub async fn handle_voice_state_update(cx: Context, new: VoiceState) {
                         &mut co_conn,
                         &cx,
                         &guild_id,
-                        member.user.id,
+                        &member.user,
                         default_channel_name_for_member(&member),
                         parent_channel,
                     )
@@ -226,13 +223,23 @@ pub async fn handle_interaction(cx: Context, interaction: Interaction) {
                                 .members(&cx)
                                 .unwrap();
                             let mut kicked_users = vec![];
+                            let actor = interaction.user.clone();
+                            let reason = format!("Kicked by @{} ({})", actor.name, actor.id);
                             for val in values {
                                 if let Some(member) = members
                                     .iter_mut()
                                     .find(|x| x.user.id.get().to_string() == *val)
                                 {
                                     kicked_users.push(format!("<@{}>", member.user.id.get()));
-                                    if let Err(err) = member.disconnect_from_voice(&cx).await {
+                                    if let Err(err) = member
+                                        .edit(
+                                            &cx,
+                                            EditMember::new()
+                                                .disconnect_member()
+                                                .audit_log_reason(&reason),
+                                        )
+                                        .await
+                                    {
                                         println!("Failed to kick user from temp voice: {err:?}");
                                     }
                                 }

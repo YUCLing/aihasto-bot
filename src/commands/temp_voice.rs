@@ -53,7 +53,15 @@ pub async fn rename(
     name: String,
 ) -> Result<(), Error> {
     let mut channel = cx.guild_channel().await.unwrap();
-    match channel.edit(&cx, EditChannel::new().name(&name)).await {
+    let actor = cx.author();
+    let reason = format!("Renamed by @{} ({})", actor.name, actor.id);
+    match channel
+        .edit(
+            &cx,
+            EditChannel::new().name(&name).audit_log_reason(&reason),
+        )
+        .await
+    {
         Ok(_) => {
             cx.say(format!("The channel has been renamed to {}", name))
                 .await

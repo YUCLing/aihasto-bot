@@ -57,8 +57,15 @@ pub async fn slowmode(
     })
     .await?;
     let mut channel = channel.unwrap_or(cx.guild_channel().await.unwrap());
+    let actor = cx.author();
+    let reason = format!("Rate limit updated by @{} ({})", actor.name, actor.id);
     channel
-        .edit(cx, EditChannel::new().rate_limit_per_user(cooldown))
+        .edit(
+            cx,
+            EditChannel::new()
+                .rate_limit_per_user(cooldown)
+                .audit_log_reason(&reason),
+        )
         .await?;
     Ok(())
 }
