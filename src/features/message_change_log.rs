@@ -55,7 +55,7 @@ pub async fn handle_message_delete(
                         .iter()
                         .map(|x| x.url.clone())
                         .collect::<Vec<String>>()
-                        .join(", "),
+                        .join("\n"),
                     false,
                 )
                 .footer(CreateEmbedFooter::new(
@@ -153,7 +153,7 @@ pub async fn handle_message_update(
                         .iter()
                         .map(|x| x.url.clone())
                         .collect::<Vec<String>>()
-                        .join(", "),
+                        .join("\n"),
                     false,
                 )
                 .footer(CreateEmbedFooter::new(
