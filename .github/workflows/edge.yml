@@ -7,9 +7,6 @@ on:
 jobs:
   build-and-deploy-image:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        platform: [ "linux/amd64", "linux/arm64" ]
     permissions:
       contents: read
       packages: write
@@ -28,6 +25,6 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           file: docker/Dockerfile
-          platforms: ${{ matrix.platform }}
+          platforms: linux/amd64, linux/arm64
           push: true
           tags: ghcr.io/yucling/aihasto-bot:edge
