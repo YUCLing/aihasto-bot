@@ -8,7 +8,7 @@ use serenity::{
 };
 
 use crate::{
-    data::{BotIdKey, ConnectionPoolKey},
+    data::ConnectionPoolKey,
     features::{message_change_log, moderation_log, temp_voice},
     schema::voice_channels,
 };
@@ -19,10 +19,6 @@ pub struct Handler;
 impl EventHandler for Handler {
     async fn ready(&self, cx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
-        cx.data
-            .write()
-            .await
-            .insert::<BotIdKey>(ready.user.id.get());
         cx.set_presence(
             Some(ActivityData::playing("Catridges")),
             serenity::all::OnlineStatus::DoNotDisturb,

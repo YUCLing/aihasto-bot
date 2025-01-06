@@ -25,12 +25,6 @@ impl TypeMapKey for QueueKey {
     type Value = AsyncQueue;
 }
 
-pub struct BotIdKey;
-
-impl TypeMapKey for BotIdKey {
-    type Value = u64;
-}
-
 #[derive(Clone)]
 pub struct CacheHttpHolder(pub(crate) Arc<Cache>, pub(crate) Arc<Http>);
 

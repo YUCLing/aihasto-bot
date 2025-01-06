@@ -7,6 +7,7 @@ use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use event_handler::Handler;
 use fang::{AsyncQueue, AsyncWorkerPool};
 use lazy_static::lazy_static;
+use poise::PrefixFrameworkOptions;
 use r2d2::{Pool, PooledConnection};
 use serenity::{all::GatewayIntents, Client};
 
@@ -54,6 +55,10 @@ async fn main() {
 
     let options = poise::FrameworkOptions::<_, Error> {
         commands: build_commands(),
+        prefix_options: PrefixFrameworkOptions {
+            prefix: Some("!".to_string()),
+            ..Default::default()
+        },
         ..Default::default()
     };
 

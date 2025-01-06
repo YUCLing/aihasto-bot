@@ -131,7 +131,7 @@ pub async fn handle_message_update(
                     format!(
                         "<t:{}>",
                         msg.edited_timestamp
-                            .expect("Why an edited message doesn't contain a timestamp.")
+                            .expect("Why an edited message doesn't contain a timestamp.") // todo: this does fail, need investigation...
                             .timestamp()
                     ),
                     true,

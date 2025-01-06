@@ -1,7 +1,10 @@
 [package]
 name = "aihasto-bot"
-version = "0.1.0"
+version = "0.1.0-alpha"
 edition = "2021"
+
+[build-dependencies]
+git2 = { version = "0.20.0", default-features = false }
 
 [dependencies]
 chrono = "0.4.39"
