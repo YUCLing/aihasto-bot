@@ -87,8 +87,8 @@ pub async fn inspect(
     let mut timeouts = 0;
     let mut bans = 0;
     for result in {
-        use diesel::dsl::*;
         use crate::schema::moderation_log::*;
+        use diesel::dsl::*;
         table
             .filter(ModerationLog::by_user(user.clone()))
             .group_by(kind)

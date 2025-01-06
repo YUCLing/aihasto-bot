@@ -99,7 +99,8 @@ async fn main() {
     let intents = GatewayIntents::privileged()
         | GatewayIntents::GUILDS
         | GatewayIntents::GUILD_VOICE_STATES
-        | GatewayIntents::GUILD_MODERATION;
+        | GatewayIntents::GUILD_MODERATION
+        | GatewayIntents::GUILD_MESSAGES;
 
     let queue_clone = queue.clone();
     let mut client = Client::builder(token, intents)
@@ -114,6 +115,8 @@ async fn main() {
         let mut cache_http = CACHE_HTTP.write().unwrap();
         *cache_http = Some(CacheHttpHolder(client.cache.clone(), client.http.clone()));
     }
+
+    client.cache.set_max_messages(256);
 
     println!("Starting queue workers...");
     let mut pool: AsyncWorkerPool<AsyncQueue> = AsyncWorkerPool::builder()

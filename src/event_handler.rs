@@ -1,15 +1,15 @@
 use diesel::{delete, ExpressionMethods, RunQueryDsl};
 use serenity::{
     all::{
-        ActivityData, AuditLogEntry, ChannelType, Context, EventHandler, GuildChannel, GuildId,
-        Interaction, Message, Ready, VoiceState,
+        ActivityData, AuditLogEntry, ChannelId, ChannelType, Context, EventHandler, GuildChannel,
+        GuildId, Interaction, Message, MessageId, MessageUpdateEvent, Ready, VoiceState,
     },
     async_trait,
 };
 
 use crate::{
     data::{BotIdKey, ConnectionPoolKey},
-    features::{moderation_log, temp_voice},
+    features::{message_change_log, moderation_log, temp_voice},
     schema::voice_channels,
 };
 
@@ -58,6 +58,51 @@ impl EventHandler for Handler {
     ) {
         tokio::spawn(moderation_log::guild_audit_log_entry_create(
             cx, entry, guild_id,
+        ));
+    }
+
+    async fn message_delete(
+        &self,
+        cx: Context,
+        channel_id: ChannelId,
+        deleted_message_id: MessageId,
+        guild_id: Option<GuildId>,
+    ) {
+        tokio::spawn(message_change_log::handle_message_delete(
+            cx,
+            channel_id,
+            deleted_message_id,
+            guild_id,
+        ));
+    }
+
+    async fn message_delete_bulk(
+        &self,
+        cx: Context,
+        channel_id: ChannelId,
+        multiple_deleted_messages_ids: Vec<MessageId>,
+        guild_id: Option<GuildId>,
+    ) {
+        tokio::spawn(message_change_log::handle_message_delete_bulk(
+            cx,
+            channel_id,
+            multiple_deleted_messages_ids,
+            guild_id,
+        ));
+    }
+
+    async fn message_update(
+        &self,
+        cx: Context,
+        old_if_available: Option<Message>,
+        new: Option<Message>,
+        event: MessageUpdateEvent,
+    ) {
+        tokio::spawn(message_change_log::handle_message_update(
+            cx,
+            old_if_available,
+            new,
+            event,
         ));
     }
 
