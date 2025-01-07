@@ -24,8 +24,7 @@ pub async fn guild_audit_log_entry_create(cx: Context, entry: AuditLogEntry, gui
                     Change::RolesRemove { old: _, new: roles } => {
                         let removed_roles = roles.unwrap();
                         let user_id = UserId::new(entry.target_id.unwrap().get());
-                        let lck = cx.data.read().await;
-                        let queue = lck.get::<QueueKey>().unwrap();
+                        let queue = cx.data.read().await.get::<QueueKey>().unwrap().clone();
                         for role in removed_roles {
                             let task = RemoveTempRole::new(guild_id, user_id, role.id, 0);
                             match queue.remove_task_by_metadata(&task).await {
