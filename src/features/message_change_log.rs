@@ -38,10 +38,11 @@ pub async fn handle_message_delete(
             .title("Message Deleted")
             .fields([
                 ("User", format!("<@{}>", cached_msg.author.id), true),
+                ("Channel", format!("<#{}>", cached_msg.channel_id), true),
                 (
                     "Sent at",
                     format!("<t:{}>", cached_msg.timestamp.timestamp()),
-                    true,
+                    false,
                 ),
             ])
             .author(cached_msg.author.into())
@@ -126,6 +127,7 @@ pub async fn handle_message_update(
             .title("Message Edited")
             .fields([
                 ("User", format!("<@{}>", author.id), true),
+                ("Channel", format!("<#{}>", msg.channel_id), true),
                 (
                     "Edited at",
                     format!(
@@ -134,7 +136,7 @@ pub async fn handle_message_update(
                             .expect("Why an edited message doesn't contain a timestamp.") // todo: this does fail, need investigation...
                             .timestamp()
                     ),
-                    true,
+                    false,
                 ),
             ])
             .author(author.into())
