@@ -140,13 +140,17 @@ pub async fn handle_message_update(
                 ),
             ])
             .author(author.into())
-            .description(format!(
-                "**_Old Message_**\n\
-                {}\n\n\
-                **_New Message_**\n\
-                {}",
-                old_message.content, msg.content
-            ));
+            .description(if old_message.content != msg.content {
+                format!(
+                    "**_Old Message_**\n\
+                    {}\n\n\
+                    **_New Message_**\n\
+                    {}",
+                    old_message.content, msg.content
+                )
+            } else {
+                "_No content changes._".to_string()
+            });
         if !removed_attachments.is_empty() {
             embed = embed
                 .field(
