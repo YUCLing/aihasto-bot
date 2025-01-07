@@ -1,10 +1,11 @@
 use diesel::RunQueryDsl;
+use fang::AsyncQueueable;
 use serenity::all::{
     audit_log::Action, AuditLogEntry, Change, ChannelId, Context, GuildId, MemberAction, UserId,
 };
 
 use crate::{
-    data::ConnectionPoolKey,
+    data::{ConnectionPoolKey, QueueKey},
     models::{
         guild_settings::GuildSettings,
         moderation_log::{CreateModerationLog, ModerationAction, ModerationLog},
@@ -12,10 +13,33 @@ use crate::{
     util::send_moderation_logs,
 };
 
-use super::moderation_dm::generate_dm_message;
+use super::{moderation_dm::generate_dm_message, temp_role::RemoveTempRole};
 
 pub async fn guild_audit_log_entry_create(cx: Context, entry: AuditLogEntry, guild_id: GuildId) {
     match entry.action {
+        Action::Member(MemberAction::RoleUpdate) => {
+            let changes = entry.changes.unwrap();
+            for change in changes {
+                match change {
+                    Change::RolesRemove { old: _, new: roles } => {
+                        let removed_roles = roles.unwrap();
+                        let user_id = UserId::new(entry.target_id.unwrap().get());
+                        let lck = cx.data.read().await;
+                        let queue = lck.get::<QueueKey>().unwrap();
+                        for role in removed_roles {
+                            let task = RemoveTempRole::new(guild_id, user_id, role.id, 0);
+                            match queue.remove_task_by_metadata(&task).await {
+                                Err(err) => {
+                                    println!("Unable to remove temp role task: {}", err);
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
         Action::Member(MemberAction::Update) => {
             let changes = entry.changes.unwrap();
             for change in changes {

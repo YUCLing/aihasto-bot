@@ -18,7 +18,14 @@ pub async fn beep(cx: Context<'_>) -> Result<(), Error> {
             ))
             .fields([
                 ("Version", format!("`{}`", env!("CARGO_PKG_VERSION")), true),
-                ("Build", format!("`{}`", &option_env!("BUILD_COMMIT").unwrap_or("unknown")[0..7]), true),
+                (
+                    "Build",
+                    format!(
+                        "`{}`",
+                        &option_env!("BUILD_COMMIT").unwrap_or("unknown")[0..7]
+                    ),
+                    true,
+                ),
             ])
             .thumbnail(
                 current_user

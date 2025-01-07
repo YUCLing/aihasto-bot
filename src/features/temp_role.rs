@@ -1,4 +1,3 @@
-use chrono::DateTime;
 use fang::async_trait;
 use fang::typetag;
 use fang::AsyncQueueable;
@@ -18,7 +17,8 @@ pub struct RemoveTempRole {
     guild_id: u64,
     user_id: u64,
     role_id: u64,
-    remove_time: i64,
+    #[serde(skip)]
+    duration: u64,
 }
 
 impl RemoveTempRole {
@@ -32,8 +32,7 @@ impl RemoveTempRole {
             guild_id: guild.into().get(),
             user_id: user.into().get(),
             role_id: role.into().get(),
-            remove_time: (chrono::Utc::now() + std::time::Duration::from_secs(duration))
-                .timestamp(),
+            duration,
         }
     }
 }
@@ -63,7 +62,7 @@ impl AsyncRunnable for RemoveTempRole {
 
     fn cron(&self) -> Option<Scheduled> {
         Some(Scheduled::ScheduleOnce(
-            DateTime::from_timestamp(self.remove_time, 0).unwrap(),
+            chrono::Utc::now() + std::time::Duration::from_secs(self.duration),
         ))
     }
 
