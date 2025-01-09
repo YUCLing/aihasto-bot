@@ -62,6 +62,15 @@ diesel::table! {
 }
 
 diesel::table! {
+    moderation_log_message (id) {
+        id -> Int8,
+        log_id -> Uuid,
+        guild -> Int8,
+        channel -> Int8,
+    }
+}
+
+diesel::table! {
     voice_channels (id) {
         id -> Int8,
         guild -> Int8,
@@ -70,10 +79,13 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(moderation_log_message -> moderation_log (log_id));
+
 diesel::allow_tables_to_appear_in_same_query!(
     allowed_roles,
     fang_tasks,
     guild_settings,
     moderation_log,
+    moderation_log_message,
     voice_channels,
 );

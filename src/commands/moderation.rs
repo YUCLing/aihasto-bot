@@ -6,7 +6,8 @@ use diesel::{
 use fang::AsyncQueueable;
 use poise::CreateReply;
 use serenity::all::{
-    ChannelId, Colour, CreateEmbed, CreateMessage, EditChannel, Member, RoleId, User,
+    ChannelId, Colour, CreateEmbed, CreateMessage, EditChannel, EditMessage, Member, MessageId,
+    RoleId, User,
 };
 use uuid::Uuid;
 
@@ -16,7 +17,7 @@ use crate::{
         guild_settings::GuildSettings,
         moderation_log::{CreateModerationLog, ModerationAction, ModerationLog},
     },
-    util::{parse_duration_to_seconds, send_moderation_logs},
+    util::{parse_duration_to_seconds, send_moderation_logs_with_database_records},
     Context, Error,
 };
 
@@ -183,7 +184,14 @@ pub async fn warning(
     ))
     .await?;
     if let Some(channel) = GuildSettings::get(&mut conn, guild_id, "moderation_log_channel") {
-        send_moderation_logs(&cx, ChannelId::new(channel.parse().unwrap()), [log]).await?;
+        send_moderation_logs_with_database_records(
+            &mut conn,
+            &cx,
+            guild_id,
+            ChannelId::new(channel.parse().unwrap()),
+            [log],
+        )
+        .await?;
     }
     Ok(())
 }
@@ -266,7 +274,14 @@ pub async fn flood(
     ))
     .await?;
     if let Some(channel) = GuildSettings::get(&mut conn, guild_id, "moderation_log_channel") {
-        send_moderation_logs(&cx, ChannelId::new(channel.parse().unwrap()), [log]).await?;
+        send_moderation_logs_with_database_records(
+            &mut conn,
+            &cx,
+            guild_id,
+            ChannelId::new(channel.parse().unwrap()),
+            [log],
+        )
+        .await?;
     }
     Ok(())
 }
@@ -302,12 +317,31 @@ pub async fn reason(
     if let Some(channel) =
         GuildSettings::get(&mut conn, cx.guild_id().unwrap(), "moderation_log_channel")
     {
-        ChannelId::new(channel.parse().unwrap())
+        let result: Option<(i64, i64, i64)> = {
+            use crate::schema::moderation_log_message::*;
+            table
+                .filter(log_id.eq(log.id))
+                .select((id, guild, channel))
+                .get_result(&mut conn)
+                .optional()?
+        };
+        let channel = ChannelId::new(channel.parse().unwrap());
+        channel
             .send_message(
                 &cx,
-                CreateMessage::new()
-                    .content("A case has been updated.")
-                    .embed(log.into()),
+                if let Some((message_id, guild_id, channel_id)) = result {
+                    channel.edit_message(&cx, MessageId::new(message_id.try_into().unwrap()), EditMessage::new()
+                        .embed(log.into()))
+                        .await?;
+                    CreateMessage::new().content(format!(
+                        "A case has been updated.\nLink to the case: https://discord.com/channels/{}/{}/{}",
+                        guild_id, channel_id, message_id
+                    ))
+                } else {
+                    CreateMessage::new()
+                        .content("A case has been updated.")
+                        .embed(log.into())
+                },
             )
             .await?;
     }

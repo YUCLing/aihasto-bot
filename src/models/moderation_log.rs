@@ -17,7 +17,7 @@ use uuid::Uuid;
 
 use crate::schema::{moderation_log, sql_types::ModerationAction as SqlModerationAction};
 
-#[derive(Debug, Clone, AsExpression, FromSqlRow)]
+#[derive(Debug, Clone, AsExpression, FromSqlRow, PartialEq, Eq, Hash)]
 #[diesel(sql_type = SqlModerationAction)]
 pub enum ModerationAction {
     Warning,
@@ -81,7 +81,7 @@ impl CreateModerationLog {
 }
 
 #[allow(dead_code)]
-#[derive(Queryable, Selectable, Clone)]
+#[derive(Queryable, Selectable, Clone, PartialEq, Eq, Hash)]
 #[diesel(table_name = crate::schema::moderation_log)]
 pub struct ModerationLog {
     pub id: Uuid,

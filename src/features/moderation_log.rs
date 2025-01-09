@@ -10,7 +10,7 @@ use crate::{
         guild_settings::GuildSettings,
         moderation_log::{CreateModerationLog, ModerationAction, ModerationLog},
     },
-    util::send_moderation_logs,
+    util::send_moderation_logs_with_database_records,
 };
 
 use super::{moderation_dm::generate_dm_message, temp_role::RemoveTempRole};
@@ -86,7 +86,10 @@ pub async fn guild_audit_log_entry_create(cx: Context, entry: AuditLogEntry, gui
                                     "moderation_log_channel",
                                 ) {
                                     let channel = ChannelId::new(channel.parse().unwrap());
-                                    let _ = send_moderation_logs(&cx, channel, logs).await;
+                                    let _ = send_moderation_logs_with_database_records(
+                                        &mut conn, &cx, guild_id, channel, logs,
+                                    )
+                                    .await;
                                 }
                             });
                         }
@@ -118,7 +121,7 @@ pub async fn guild_audit_log_entry_create(cx: Context, entry: AuditLogEntry, gui
             if let Some(channel) = GuildSettings::get(&mut conn, guild_id, "moderation_log_channel")
             {
                 let channel = ChannelId::new(channel.parse().unwrap());
-                send_moderation_logs(&cx, channel, logs)
+                send_moderation_logs_with_database_records(&mut conn, &cx, guild_id, channel, logs)
                     .await
                     .expect("Unable to send moderation logs.");
             }

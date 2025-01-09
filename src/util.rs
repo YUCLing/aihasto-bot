@@ -1,6 +1,9 @@
-use serenity::all::{CacheHttp, ChannelId, CreateMessage};
+use std::collections::HashMap;
 
-use crate::{models::moderation_log::ModerationLog, Error};
+use diesel::{ExpressionMethods, RunQueryDsl};
+use serenity::all::{CacheHttp, ChannelId, CreateMessage, GuildId, Message};
+
+use crate::{models::moderation_log::ModerationLog, Connection, Error};
 
 pub fn parse_duration_to_seconds<T: AsRef<str>>(duration: T) -> Result<u64, String> {
     let mut total_seconds = 0;
@@ -53,12 +56,49 @@ pub async fn send_moderation_logs<
     cx: &T,
     channel: U,
     logs: V,
-) -> Result<(), Error> {
-    let channel = channel.into();
+) -> Result<HashMap<ModerationLog, Message>, Error> {
+    let channel: ChannelId = channel.into();
+    let mut map = HashMap::new();
     for log in logs {
-        channel
+        let msg = channel
             .send_message(cx, CreateMessage::new().embed(log.clone().into()))
             .await?;
+        map.insert(log, msg);
     }
-    Ok(())
+    Ok(map)
+}
+
+pub async fn send_moderation_logs_with_database_records<
+    T: CacheHttp,
+    U: Into<GuildId>,
+    V: Into<ChannelId>,
+    W: IntoIterator<Item = ModerationLog>,
+>(
+    conn: &mut Connection,
+    cx: &T,
+    guild_id: U,
+    channel_id: V,
+    logs: W,
+) -> Result<HashMap<ModerationLog, Message>, Error> {
+    use crate::schema::moderation_log_message::*;
+    use diesel::dsl::*;
+    let guild_id: GuildId = guild_id.into();
+    let channel_id: ChannelId = channel_id.into();
+    let map = send_moderation_logs(cx, channel_id.clone(), logs).await?;
+    let result = map.clone();
+    insert_into(table)
+        .values(
+            map.iter()
+                .map(|(log, msg)| {
+                    (
+                        id.eq(TryInto::<i64>::try_into(msg.id.get()).unwrap()),
+                        log_id.eq(log.id),
+                        guild.eq(TryInto::<i64>::try_into(guild_id.get()).unwrap()),
+                        channel.eq(TryInto::<i64>::try_into(channel_id.get()).unwrap()),
+                    )
+                })
+                .collect::<Vec<_>>(),
+        )
+        .execute(conn)?;
+    Ok(result)
 }
