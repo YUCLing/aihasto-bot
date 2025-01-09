@@ -24,6 +24,7 @@ pub async fn sman(_cx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
+/// Set the Flooder role for the server.
 #[poise::command(slash_command, ephemeral)]
 pub async fn set_flooder_role(
     cx: Context<'_>,
