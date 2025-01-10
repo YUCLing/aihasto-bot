@@ -85,7 +85,6 @@ pub async fn send_moderation_logs_with_database_records<
     let guild_id: GuildId = guild_id.into();
     let channel_id: ChannelId = channel_id.into();
     let map = send_moderation_logs(cx, channel_id.clone(), logs).await?;
-    let result = map.clone();
     insert_into(table)
         .values(
             map.iter()
@@ -100,5 +99,5 @@ pub async fn send_moderation_logs_with_database_records<
                 .collect::<Vec<_>>(),
         )
         .execute(conn)?;
-    Ok(result)
+    Ok(map)
 }
