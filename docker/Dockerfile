@@ -7,10 +7,10 @@ COPY . .
 
 ENV RUSTFLAGS='-C target-feature=-crt-static'
 RUN \
-    --mount=type=cache,target=~/.cargo/registry/index/,sharing=locked \
-    --mount=type=cache,target=~/.cargo/registry/cache/,sharing=locked \
-    --mount=type=cache,target=~/.cargo/git/db/,sharing=locked \
-    --mount=type=cache,target=target/,sharing=locked \
+    --mount=type=cache,target=~/.cargo/registry/index/ \
+    --mount=type=cache,target=~/.cargo/registry/cache/ \
+    --mount=type=cache,target=~/.cargo/git/db/ \
+    --mount=type=cache,target=target/ \
     cargo build --release
 
 FROM alpine:3.21
