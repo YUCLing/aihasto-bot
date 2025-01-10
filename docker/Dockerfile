@@ -11,13 +11,13 @@ RUN \
     --mount=type=cache,target=~/.cargo/registry/cache/ \
     --mount=type=cache,target=~/.cargo/git/db/ \
     --mount=type=cache,target=target/ \
-    cargo build --release
+    cargo build --release && mv target/release/aihasto-bot /usr/bin/aihasto-bot
 
 FROM alpine:3.21
 
 RUN apk add libpq libgcc
 
 WORKDIR /usr/bot
-COPY --from=builder /usr/src/bot/target/release/aihasto-bot ./
+COPY --from=builder /usr/bin/aihasto-bot ./
 
 CMD ["/usr/bot/aihasto-bot"]
