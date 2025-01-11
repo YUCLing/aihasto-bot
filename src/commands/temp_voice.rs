@@ -122,7 +122,7 @@ pub async fn delete(cx: Context<'_>) -> Result<(), Error> {
 pub async fn kick(cx: Context<'_>) -> Result<(), Error> {
     let channel = cx.guild_channel().await.unwrap();
     let options: Vec<CreateSelectMenuOption> = channel
-        .members(&cx)?
+        .members(cx)?
         .iter()
         .filter(|x| x.user.id != cx.author().id)
         .map(|x| {

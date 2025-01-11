@@ -11,7 +11,7 @@ impl From<ModerationLog> for CreateEmbed {
             .field("User", format!("<@{}>", value.member), true)
             .footer(CreateEmbedFooter::new(format!(
                 "ID: {}",
-                value.id.to_string()
+                value.id
             )));
         if let Some(actor) = value.actor {
             embed = embed.field("Moderator", format!("<@{}>", actor), true);

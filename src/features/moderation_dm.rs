@@ -15,7 +15,7 @@ pub fn generate_dm_message<T: Into<ChannelId>>(
         .field("Moderator", format!("<@{}>", moderator.id.get()), true)
         .footer(CreateEmbedFooter::new(format!(
             "ID: {}",
-            log.id.to_string()
+            log.id
         )));
     if let Some(channel) = channel {
         embed = embed.field("Channel", format!("<#{}>", channel.into().get()), true);

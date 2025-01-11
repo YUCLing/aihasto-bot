@@ -91,7 +91,7 @@ pub async fn remove(
 ) -> Result<(), Error> {
     let member = cx.author_member().await.unwrap();
     let operator_roles = &member.roles;
-    if !is_user_allowed_to_operate_the_role(&cx, &operator_roles, role).await {
+    if !is_user_allowed_to_operate_the_role(&cx, operator_roles, role).await {
         cx.say("You are not allowed to operate this role.").await?;
         return Ok(());
     }
@@ -137,16 +137,14 @@ pub async fn temp_add(
     #[description = "Role to be given"] role: RoleId,
     #[description = "The duration that user will have the role"] mut duration: String,
 ) -> Result<(), Error> {
-    let duration_secs = match parse_duration_to_seconds(&duration)
-        .and_then(|x| x.try_into().map_err(|_| "Invalid number".to_string()))
-    {
+    let duration_secs = match parse_duration_to_seconds(&duration) {
         Ok(x) => x,
         Err(err) => {
             cx.say(err).await?;
             return Ok(());
         }
     };
-    if duration_secs <= 0 {
+    if duration_secs == 0 {
         cx.say("Invalid duration").await?;
         return Ok(());
     }
@@ -163,7 +161,7 @@ pub async fn temp_add(
     let queue = cx.data().queue.clone();
     let task = RemoveTempRole::new(cx.guild_id().unwrap(), user.user.id, role, duration_secs);
     queue.schedule_task(&task).await?;
-    if duration.chars().last().map_or(false, |c| c.is_numeric()) {
+    if duration.chars().last().is_some_and(|c| c.is_numeric()) {
         duration.push('s');
     }
     cx.http()

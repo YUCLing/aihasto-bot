@@ -90,7 +90,7 @@ pub async fn handle_voice_state_update(cx: Context, new: VoiceState) {
                         &cx,
                         &guild_id,
                         &member.user,
-                        default_channel_name_for_member(&member),
+                        default_channel_name_for_member(member),
                         parent_channel,
                     )
                     .await
@@ -126,27 +126,22 @@ pub async fn handle_voice_state_update(cx: Context, new: VoiceState) {
                     create_channel_and_move_user.await;
                 } else {
                     // user already created a voice channel before, move the user there.
-                    if let Err(err) = member
+                    if let Err(serenity::Error::Http(
+                        serenity::all::HttpError::UnsuccessfulRequest(err),
+                    )) = member
                         .move_to_voice_channel(
                             &cx,
                             ChannelId::new(created_channels[0].id.try_into().unwrap()),
                         )
                         .await
                     {
-                        match err {
-                            serenity::Error::Http(
-                                serenity::all::HttpError::UnsuccessfulRequest(err),
-                            ) => {
-                                if err.error.code == 10003 {
-                                    // the user's channel no longer exists.
-                                    delete(voice_channels::table)
-                                        .filter(voice_channels::id.eq(created_channels[0].id))
-                                        .execute(&mut conn)
-                                        .expect("Unable to delete user's voice channel record.");
-                                    create_channel_and_move_user.await;
-                                }
-                            }
-                            _ => {}
+                        if err.error.code == 10003 {
+                            // the user's channel no longer exists.
+                            delete(voice_channels::table)
+                                .filter(voice_channels::id.eq(created_channels[0].id))
+                                .execute(&mut conn)
+                                .expect("Unable to delete user's voice channel record.");
+                            create_channel_and_move_user.await;
                         }
                     }
                 }
@@ -165,7 +160,7 @@ pub async fn handle_voice_state_update(cx: Context, new: VoiceState) {
             if let Some(channel) =
                 guild_channels.get(&ChannelId::new(voice_channel.id.try_into().unwrap()))
             {
-                if channel.members(&cx).unwrap().len() == 0 {
+                if channel.members(&cx).unwrap().is_empty() {
                     channel
                         .delete(&cx)
                         .await
@@ -177,106 +172,98 @@ pub async fn handle_voice_state_update(cx: Context, new: VoiceState) {
 }
 
 pub async fn handle_interaction(cx: Context, interaction: Interaction) {
-    match interaction {
-        Interaction::Component(interaction) => {
-            let id = interaction.data.custom_id.clone();
-            if id == "voice_kick_user".to_string() {
-                let lck = cx.data.read().await;
-                let mut conn = lck.get::<ConnectionPoolKey>().unwrap().get().unwrap();
-                let msg = interaction.message.clone();
-                let channel_id = msg.channel_id;
-                let results = voice_channels::table
-                    .filter(
-                        voice_channels::id.eq(TryInto::<i64>::try_into(channel_id.get()).unwrap()),
+    if let Interaction::Component(interaction) = interaction {
+        let id = interaction.data.custom_id.clone();
+        if id == *"voice_kick_user" {
+            let lck = cx.data.read().await;
+            let mut conn = lck.get::<ConnectionPoolKey>().unwrap().get().unwrap();
+            let msg = interaction.message.clone();
+            let channel_id = msg.channel_id;
+            let results = voice_channels::table
+                .filter(voice_channels::id.eq(TryInto::<i64>::try_into(channel_id.get()).unwrap()))
+                .filter(
+                    voice_channels::creator
+                        .eq(TryInto::<i64>::try_into(interaction.user.id.get()).unwrap()),
+                )
+                .select(VoiceChannel::as_select())
+                .load(&mut conn)
+                .unwrap();
+            if results.is_empty() {
+                // this is quite impossible, is it really necessary?
+                interaction
+                    .create_response(
+                        &cx,
+                        CreateInteractionResponse::UpdateMessage(
+                            CreateInteractionResponseMessage::new()
+                                .content("Invalid channel")
+                                .embeds(vec![])
+                                .components(vec![]),
+                        ),
                     )
-                    .filter(
-                        voice_channels::creator
-                            .eq(TryInto::<i64>::try_into(interaction.user.id.get()).unwrap()),
-                    )
-                    .select(VoiceChannel::as_select())
-                    .load(&mut conn)
+                    .await
                     .unwrap();
-                if results.is_empty() {
-                    // this is quite impossible, is it really necessary?
-                    interaction
-                        .create_response(
-                            &cx,
-                            CreateInteractionResponse::UpdateMessage(
-                                CreateInteractionResponseMessage::new()
-                                    .content("Invalid channel")
-                                    .embeds(vec![])
-                                    .components(vec![]),
-                            ),
-                        )
-                        .await
-                        .unwrap();
-                } else {
-                    match interaction.data.kind {
-                        ComponentInteractionDataKind::StringSelect { ref values } => {
-                            let mut members = msg
-                                .channel_id
-                                .to_channel(&cx)
-                                .await
-                                .unwrap()
-                                .guild()
-                                .unwrap()
-                                .members(&cx)
-                                .unwrap();
-                            let mut kicked_users = vec![];
-                            let actor = interaction.user.clone();
-                            let reason = format!("Kicked by @{} ({})", actor.name, actor.id);
-                            for val in values {
-                                if let Some(member) = members
-                                    .iter_mut()
-                                    .find(|x| x.user.id.get().to_string() == *val)
-                                {
-                                    kicked_users.push(format!("<@{}>", member.user.id.get()));
-                                    if let Err(err) = member
-                                        .edit(
-                                            &cx,
-                                            EditMember::new()
-                                                .disconnect_member()
-                                                .audit_log_reason(&reason),
-                                        )
-                                        .await
-                                    {
-                                        log::warn!("Failed to kick user from temp voice: {err:?}");
-                                    }
-                                }
-                            }
-
-                            interaction
-                                .create_response(
-                                    &cx,
-                                    CreateInteractionResponse::UpdateMessage(
-                                        CreateInteractionResponseMessage::new()
-                                            .content(if !kicked_users.is_empty() {
-                                                "The selected user has been kicked out."
-                                            } else {
-                                                "No valid user to be kicked."
-                                            })
-                                            .embeds(vec![])
-                                            .components(vec![]),
-                                    ),
-                                )
-                                .await
-                                .unwrap();
-                            interaction
-                                .create_followup(
-                                    &cx,
-                                    CreateInteractionResponseFollowup::new().content(format!(
-                                        "The owner of this channel kicked {} out.",
-                                        kicked_users.join(" , ")
-                                    )),
-                                )
-                                .await
-                                .unwrap();
+            } else if let ComponentInteractionDataKind::StringSelect { ref values } =
+                interaction.data.kind
+            {
+                let mut members = msg
+                    .channel_id
+                    .to_channel(&cx)
+                    .await
+                    .unwrap()
+                    .guild()
+                    .unwrap()
+                    .members(&cx)
+                    .unwrap();
+                let mut kicked_users = vec![];
+                let actor = interaction.user.clone();
+                let reason = format!("Kicked by @{} ({})", actor.name, actor.id);
+                for val in values {
+                    if let Some(member) = members
+                        .iter_mut()
+                        .find(|x| x.user.id.get().to_string() == *val)
+                    {
+                        kicked_users.push(format!("<@{}>", member.user.id.get()));
+                        if let Err(err) = member
+                            .edit(
+                                &cx,
+                                EditMember::new()
+                                    .disconnect_member()
+                                    .audit_log_reason(&reason),
+                            )
+                            .await
+                        {
+                            log::warn!("Failed to kick user from temp voice: {err:?}");
                         }
-                        _ => {}
                     }
                 }
+
+                interaction
+                    .create_response(
+                        &cx,
+                        CreateInteractionResponse::UpdateMessage(
+                            CreateInteractionResponseMessage::new()
+                                .content(if !kicked_users.is_empty() {
+                                    "The selected user has been kicked out."
+                                } else {
+                                    "No valid user to be kicked."
+                                })
+                                .embeds(vec![])
+                                .components(vec![]),
+                        ),
+                    )
+                    .await
+                    .unwrap();
+                interaction
+                    .create_followup(
+                        &cx,
+                        CreateInteractionResponseFollowup::new().content(format!(
+                            "The owner of this channel kicked {} out.",
+                            kicked_users.join(" , ")
+                        )),
+                    )
+                    .await
+                    .unwrap();
             }
         }
-        _ => {}
     }
 }

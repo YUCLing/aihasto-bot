@@ -180,7 +180,7 @@ pub async fn warning(
         .await?;
     cx.say(format!(
         "The user has been warned.\nCase ID: `{}`",
-        uuid.to_string()
+        uuid
     ))
     .await?;
     if let Some(channel) = GuildSettings::get(&mut conn, guild_id, "moderation_log_channel") {
@@ -204,16 +204,14 @@ pub async fn flood(
     #[description = "The duration that user will be the Flooder"] mut duration: String,
     #[description = "Reason of making the user a Flooder"] reason: Option<String>,
 ) -> Result<(), Error> {
-    let duration_secs = match parse_duration_to_seconds(&duration)
-        .and_then(|x| x.try_into().map_err(|_| "Invalid number".to_string()))
-    {
+    let duration_secs = match parse_duration_to_seconds(&duration) {
         Ok(x) => x,
         Err(err) => {
             cx.say(err).await?;
             return Ok(());
         }
     };
-    if duration_secs <= 0 {
+    if duration_secs == 0 {
         cx.say("Invalid duration").await?;
         return Ok(());
     }
@@ -232,7 +230,7 @@ pub async fn flood(
     let queue = cx.data().queue.clone();
     let task = RemoveTempRole::new(guild_id, user.user.id, flooder_role, duration_secs);
     queue.schedule_task(&task).await?;
-    if duration.chars().last().map_or(false, |c| c.is_numeric()) {
+    if duration.chars().last().is_some_and(|c| c.is_numeric()) {
         duration.push('s');
     }
     let member = cx.author_member().await.unwrap();

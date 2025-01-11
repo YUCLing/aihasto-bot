@@ -10,11 +10,8 @@ fn get_current_commit_hash() -> Result<String, Box<dyn Error>> {
 }
 
 fn main() {
-    match get_current_commit_hash() {
-        Ok(hash) => {
-            println!("cargo::rustc-env=BUILD_COMMIT={}", hash);
-        }
-        _ => {}
+    if let Ok(hash) = get_current_commit_hash() {
+        println!("cargo::rustc-env=BUILD_COMMIT={}", hash);
     }
     println!("cargo::rustc-env=BUILD_TIME={}", time::SystemTime::now().duration_since(time::UNIX_EPOCH).unwrap().as_secs());
 }

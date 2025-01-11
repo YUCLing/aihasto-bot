@@ -84,7 +84,7 @@ pub async fn send_moderation_logs_with_database_records<
     use diesel::dsl::*;
     let guild_id: GuildId = guild_id.into();
     let channel_id: ChannelId = channel_id.into();
-    let map = send_moderation_logs(cx, channel_id.clone(), logs).await?;
+    let map = send_moderation_logs(cx, channel_id, logs).await?;
     insert_into(table)
         .values(
             map.iter()
