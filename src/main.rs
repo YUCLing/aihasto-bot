@@ -73,7 +73,7 @@ async fn main() {
         },
         post_command: |cx: Context<'_>| {
             Box::pin(async move {
-                log::info!(target: "aihasto_bot::command", "@{} ({}) executed {}", cx.author().name, cx.author().id, cx.command().name);
+                log::info!(target: "aihasto_bot::command", "@{} ({}) executed \"{}\"", cx.author().name, cx.author().id, cx.command().qualified_name);
             })
         },
         ..Default::default()
