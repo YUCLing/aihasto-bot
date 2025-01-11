@@ -71,9 +71,9 @@ async fn main() {
                 log_framework_error(&err);
             })
         },
-        pre_command: |cx: Context<'_>| {
+        post_command: |cx: Context<'_>| {
             Box::pin(async move {
-                log::info!(target: "aihasto_bot::command", "@{} ({}) executes {}", cx.author().name, cx.author().id, cx.command().name);
+                log::info!(target: "aihasto_bot::command", "@{} ({}) executed {}", cx.author().name, cx.author().id, cx.command().name);
             })
         },
         ..Default::default()
