@@ -220,7 +220,7 @@ pub async fn flood(
     let guild_id = cx.guild_id().unwrap();
     let mut conn = cx.data().database.get()?;
     let Some(flooder_role) = GuildSettings::get(&mut conn, guild_id, "flooder_role")
-        .and_then(|x| Some(RoleId::new(x.parse().unwrap())))
+        .map(|x| RoleId::new(x.parse().unwrap()))
     else {
         cx.say("Flooder is disabled.").await?;
         return Ok(());

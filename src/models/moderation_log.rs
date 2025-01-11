@@ -74,8 +74,8 @@ impl CreateModerationLog {
             guild: guild.into().get().try_into().unwrap(),
             kind,
             member: member.into().get().try_into().unwrap(),
-            actor: actor.and_then(|x| Some(x.into().get().try_into().unwrap())),
-            reason: reason.and_then(|x| Some(x.as_ref().to_string())),
+            actor: actor.map(|x| x.into().get().try_into().unwrap()),
+            reason: reason.map(|x| x.as_ref().to_string()),
         }
     }
 }

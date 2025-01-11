@@ -1,4 +1,4 @@
-use std::{env, error::Error};
+use std::{env, error::Error, time};
 
 use git2::Repository;
 
@@ -12,8 +12,9 @@ fn get_current_commit_hash() -> Result<String, Box<dyn Error>> {
 fn main() {
     match get_current_commit_hash() {
         Ok(hash) => {
-            println!("cargo::rustc-env=BUILD_COMMIT={}", hash)
+            println!("cargo::rustc-env=BUILD_COMMIT={}", hash);
         }
         _ => {}
     }
+    println!("cargo::rustc-env=BUILD_TIME={}", time::SystemTime::now().duration_since(time::UNIX_EPOCH).unwrap().as_secs());
 }

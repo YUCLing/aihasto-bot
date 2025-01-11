@@ -35,7 +35,7 @@ pub fn setup_panic_logger_hook() {
             log::error!(
                 "Panic occurred at {}: {}",
                 info.location()
-                    .and_then(|x| Some(x.to_string()))
+                    .map(|x| x.to_string())
                     .unwrap_or("unknown".to_string()),
                 str
             );
@@ -49,7 +49,7 @@ pub fn setup_panic_logger_hook() {
             log::error!(
                 "Panic occurred at {}",
                 info.location()
-                    .and_then(|x| Some(x.to_string()))
+                    .map(|x| x.to_string())
                     .unwrap_or("unknown".to_string())
             );
         }

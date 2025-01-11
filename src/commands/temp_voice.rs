@@ -89,7 +89,7 @@ pub async fn limit(
             cx.say(format!(
                 "The user limit of the channel has been set to {}",
                 count
-                    .and_then(|x| Some(x.to_string()))
+                    .map(|x| x.to_string())
                     .unwrap_or("unlimited".to_string())
             ))
             .await

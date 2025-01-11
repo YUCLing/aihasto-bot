@@ -27,7 +27,7 @@ impl From<ModerationLog> for CreateEmbed {
                 "Updated at",
                 value
                     .updated_at
-                    .and_then(|x| Some(format!("<t:{}>", x.and_utc().timestamp())))
+                    .map(|x| format!("<t:{}>", x.and_utc().timestamp()))
                     .unwrap_or("Not yet updated".to_string()),
                 true,
             ),

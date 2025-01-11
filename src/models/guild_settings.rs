@@ -25,7 +25,7 @@ impl GuildSettings {
     ) -> QueryResult<usize> {
         let id: i64 = guild.into().get().try_into().unwrap();
         let key = key.as_ref().to_string();
-        let value = value.and_then(|x| Some(x.as_ref().to_string()));
+        let value = value.map(|x| x.as_ref().to_string());
         insert_into(guild_settings::table)
             .values(GuildSettings {
                 guild: id,

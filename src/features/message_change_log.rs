@@ -17,7 +17,7 @@ pub async fn handle_message_delete(
     let Some(cached_msg) = cx
         .cache
         .message(channel_id, deleted_message_id)
-        .and_then(|x| Some(x.clone()))
+        .map(|x| x.clone())
     else {
         // we missed out the message...
         return;
@@ -31,7 +31,7 @@ pub async fn handle_message_delete(
         .get()
         .expect("Unable to get a database connection.");
     if let Some(log_channel) = GuildSettings::get(&mut conn, guild_id, "message_change_log_channel")
-        .and_then(|x| Some(ChannelId::new(x.parse().unwrap())))
+        .map(|x| ChannelId::new(x.parse().unwrap()))
     {
         let mut embed = CreateEmbed::new()
             .color(Colour::RED)
@@ -120,7 +120,7 @@ pub async fn handle_message_update(
         .get()
         .expect("Unable to get a database connection.");
     if let Some(log_channel) = GuildSettings::get(&mut conn, guild_id, "message_change_log_channel")
-        .and_then(|x| Some(ChannelId::new(x.parse().unwrap())))
+        .map(|x| ChannelId::new(x.parse().unwrap()))
     {
         let author = event
             .author
