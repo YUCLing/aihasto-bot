@@ -104,6 +104,10 @@ pub async fn handle_message_update(
         // where is the message?
         return;
     };
+    let Some(edited_timestamp) = msg.edited_timestamp else {
+        // editing embed doesn't add an edited timestamp (probably)
+        return;
+    };
     let Some(guild_id) = event.guild_id else {
         return;
     };
@@ -130,12 +134,7 @@ pub async fn handle_message_update(
                 ("Channel", format!("<#{}>", msg.channel_id), true),
                 (
                     "Edited at",
-                    format!(
-                        "<t:{}>",
-                        msg.edited_timestamp
-                            .expect("Why an edited message doesn't contain a timestamp.") // todo: this does fail, need investigation...
-                            .timestamp()
-                    ),
+                    format!("<t:{}>", edited_timestamp.timestamp()),
                     false,
                 ),
             ])
