@@ -33,7 +33,11 @@ jobs:
             cargo-registry-cache
             cargo-git-db
             cargo-target
-          key: cache-${{ hashFiles('docker/Dockerfile') }}
+          key: cache-${{ hashFiles('docker/Dockerfile') }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            cache-${{ hashFiles('docker/Dockerfile') }}-${{ hashFiles('Cargo.lock') }}
+            cache-${{ hashFiles('docker/Dockerfile') }}-
+            cache-
 
       - name: Inject cache into Docker
         uses: reproducible-containers/buildkit-cache-dance@v3.1.0
