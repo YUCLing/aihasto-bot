@@ -118,7 +118,7 @@ pub async fn handle_voice_state_update(cx: Context, new: VoiceState) {
                             };
                         }
                         Err(err) => {
-                            eprintln!("Failed to create voice channel: {err:?}");
+                            log::warn!("Failed to create voice channel: {err:?}");
                         }
                     }
                 };
@@ -240,7 +240,7 @@ pub async fn handle_interaction(cx: Context, interaction: Interaction) {
                                         )
                                         .await
                                     {
-                                        println!("Failed to kick user from temp voice: {err:?}");
+                                        log::warn!("Failed to kick user from temp voice: {err:?}");
                                     }
                                 }
                             }

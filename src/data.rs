@@ -8,6 +8,7 @@ use serenity::{
 
 use crate::ConnectionPool;
 
+#[derive(Debug)]
 pub struct Data {
     pub(crate) database: ConnectionPool,
     pub(crate) queue: AsyncQueue,

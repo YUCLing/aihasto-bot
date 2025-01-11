@@ -18,7 +18,14 @@ pub struct Handler;
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, cx: Context, ready: Ready) {
-        println!("{} is connected!", ready.user.name);
+        log::info!(
+            "Bot {} is connected!",
+            ready
+                .user
+                .global_name
+                .clone()
+                .unwrap_or(ready.user.name.clone())
+        );
         cx.set_presence(
             Some(ActivityData::playing("Catridges")),
             serenity::all::OnlineStatus::DoNotDisturb,

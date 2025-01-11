@@ -1,4 +1,4 @@
-use std::{env, sync::RwLock};
+use std::{env, panic, sync::RwLock};
 
 use commands::build_commands;
 use data::{CacheHttpHolder, ConnectionPoolKey, Data, QueueKey};
@@ -7,7 +7,8 @@ use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use event_handler::Handler;
 use fang::{AsyncQueue, AsyncWorkerPool};
 use lazy_static::lazy_static;
-use poise::PrefixFrameworkOptions;
+use logging::{log_framework_error, setup_logger, setup_panic_logger_hook};
+use poise::{FrameworkError, PrefixFrameworkOptions};
 use r2d2::{Pool, PooledConnection};
 use serenity::{all::GatewayIntents, Client};
 
@@ -25,6 +26,7 @@ mod data;
 mod embeds;
 mod event_handler;
 mod features;
+mod logging;
 mod models;
 mod schema;
 mod util;
@@ -44,11 +46,16 @@ fn acquire_cache_http() -> CacheHttpHolder {
 
 #[tokio::main]
 async fn main() {
+    // behavior of logger can be configured with environment variables,
+    // so loads .env before setting up the logger.
     if let Err(err) = dotenvy::dotenv() {
         if !err.not_found() {
             panic!("{err}");
         }
     }
+
+    setup_logger().expect("Unable to setup logger.");
+    setup_panic_logger_hook();
 
     let token = env::var("DISCORD_TOKEN").expect("Discord Bot token is required.");
     let db_url = env::var("DATABASE_URL").expect("Database URL is required.");
@@ -58,6 +65,16 @@ async fn main() {
         prefix_options: PrefixFrameworkOptions {
             prefix: Some("!".to_string()),
             ..Default::default()
+        },
+        on_error: |err: FrameworkError<'_, Data, Error>| {
+            Box::pin(async move {
+                log_framework_error(&err);
+            })
+        },
+        pre_command: |cx: Context<'_>| {
+            Box::pin(async move {
+                log::info!(target: "aihasto_bot::command", "@{} ({}) executes {}", cx.author().name, cx.author().id, cx.command().name);
+            })
         },
         ..Default::default()
     };
@@ -73,7 +90,7 @@ async fn main() {
             .expect("Unable to migrate the database.");
     }
 
-    println!("Database connection pool created.");
+    log::info!("Database pool created.");
 
     let mut queue = AsyncQueue::builder()
         .uri(db_url)
@@ -82,7 +99,7 @@ async fn main() {
 
     queue.connect().await.unwrap();
 
-    println!("Queue created.");
+    log::info!("Queue created.");
 
     let pool_clone = pool.clone();
     let queue_clone = queue.clone();
@@ -123,16 +140,17 @@ async fn main() {
 
     client.cache.set_max_messages(256);
 
-    println!("Starting queue workers...");
     let mut pool: AsyncWorkerPool<AsyncQueue> = AsyncWorkerPool::builder()
         .number_of_workers(4u32)
         .queue(queue)
         .build();
     pool.start().await;
 
-    println!("Starting bot...");
+    log::info!("Queue workers started.");
+
+    log::info!("Starting bot...");
 
     if let Err(err) = client.start().await {
-        eprintln!("Client error: {err:?}");
+        log::error!("Client error: {err:?}");
     }
 }

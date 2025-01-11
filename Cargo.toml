@@ -12,7 +12,9 @@ diesel = { version = "2.2.6", features = ["postgres", "r2d2", "chrono", "uuid"] 
 diesel_migrations = { version = "2.2.0", features = ["postgres"] }
 dotenvy = "0.15.7"
 fang = { git = "https://github.com/ayrat555/fang.git", rev = "31a5ac64f86448e5ab736eaad227c366d4aece0a", features = ["asynk-postgres"], default-features = false }
+fern = { version = "0.7.1", features = ["colored"] }
 lazy_static = "1.5.0"
+log = "0.4.24"
 poise = "0.6.1"
 r2d2 = "0.8.10"
 serde = { version = "1.0.217", features = ["derive"] }

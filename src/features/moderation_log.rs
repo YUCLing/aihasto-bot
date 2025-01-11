@@ -29,7 +29,7 @@ pub async fn guild_audit_log_entry_create(cx: Context, entry: AuditLogEntry, gui
                             let task = RemoveTempRole::new(guild_id, user_id, role.id, 0);
                             match queue.remove_task_by_metadata(&task).await {
                                 Err(err) => {
-                                    println!("Unable to remove temp role task: {}", err);
+                                    log::warn!("Unable to remove temp role task: {}", err);
                                 }
                                 _ => {}
                             }
