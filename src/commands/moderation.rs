@@ -3,16 +3,15 @@ use std::str::FromStr;
 use diesel::{
     update, ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl, SelectableHelper,
 };
-use fang::AsyncQueueable;
-use poise::CreateReply;
+use poise::{Context as PoiseContext, CreateReply};
 use serenity::all::{
-    ChannelId, Colour, CreateEmbed, CreateMessage, EditChannel, EditMessage, Member, MessageId,
-    RoleId, User,
+    ChannelId, Colour, CreateActionRow, CreateEmbed, CreateInputText, CreateInteractionResponse,
+    CreateMessage, CreateModal, EditChannel, EditMessage, Member, MessageId, User,
 };
 use uuid::Uuid;
 
 use crate::{
-    features::{moderation_dm::generate_dm_message, temp_role::RemoveTempRole},
+    features::{moderation::flood_impl, moderation_dm::generate_dm_message},
     models::{
         guild_settings::GuildSettings,
         moderation_log::{CreateModerationLog, ModerationAction, ModerationLog},
@@ -178,11 +177,8 @@ pub async fn warning(
             generate_dm_message(&log, cx.author(), Some(cx.channel_id())),
         )
         .await?;
-    cx.say(format!(
-        "The user has been warned.\nCase ID: `{}`",
-        uuid
-    ))
-    .await?;
+    cx.say(format!("The user has been warned.\nCase ID: `{}`", uuid))
+        .await?;
     if let Some(channel) = GuildSettings::get(&mut conn, guild_id, "moderation_log_channel") {
         send_moderation_logs_with_database_records(
             &mut conn,
@@ -201,85 +197,60 @@ pub async fn warning(
 pub async fn flood(
     cx: Context<'_>,
     #[description = "User that gets the Flooder"] user: Member,
-    #[description = "The duration that user will be the Flooder"] mut duration: String,
+    #[description = "The duration that user will be the Flooder"] duration: String,
     #[description = "Reason of making the user a Flooder"] reason: Option<String>,
 ) -> Result<(), Error> {
-    let duration_secs = match parse_duration_to_seconds(&duration) {
-        Ok(x) => x,
-        Err(err) => {
-            cx.say(err).await?;
-            return Ok(());
-        }
-    };
-    if duration_secs == 0 {
-        cx.say("Invalid duration").await?;
-        return Ok(());
-    }
-    let guild_id = cx.guild_id().unwrap();
     let mut conn = cx.data().database.get()?;
-    let Some(flooder_role) = GuildSettings::get(&mut conn, guild_id, "flooder_role")
-        .map(|x| RoleId::new(x.parse().unwrap()))
-    else {
-        cx.say("Flooder is disabled.").await?;
-        return Ok(());
-    };
-    if user.roles.contains(&flooder_role) {
-        cx.say("User is already a Flooder.").await?;
-        return Ok(());
-    }
-    let queue = cx.data().queue.clone();
-    let task = RemoveTempRole::new(guild_id, user.user.id, flooder_role, duration_secs);
-    queue.schedule_task(&task).await?;
-    if duration.chars().last().is_some_and(|c| c.is_numeric()) {
-        duration.push('s');
-    }
-    let member = cx.author_member().await.unwrap();
-    cx.http()
-        .add_member_role(
-            guild_id,
-            user.user.id,
-            flooder_role,
-            Some(
-                format!(
-                    "Flooded by @{} ({}) with a duration of {}",
-                    member.user.name, member.user.id, duration
-                )
-                .as_ref(),
-            ),
-        )
-        .await?;
-    let log: ModerationLog = ModerationLog::insert()
-        .values([CreateModerationLog::new(
-            guild_id,
-            ModerationAction::Flood,
-            user.user.id,
-            Some(cx.author().id),
-            reason.clone(),
-        )])
-        .get_result(&mut conn)?;
-    let uuid = log.id;
-    user.user
-        .dm(
+    let queue = &cx.data().queue;
+    cx.say(
+        flood_impl(
             &cx,
-            generate_dm_message(&log, cx.author(), Some(cx.channel_id())),
+            (&mut conn, queue),
+            cx.channel_id(),
+            user,
+            cx.author(),
+            duration,
+            reason,
         )
-        .await?;
-    cx.say(format!(
-        "Made <@{}> Flooder with a duration of **{}**.\nCase ID: `{}`",
-        user.user.id.get(),
-        duration,
-        uuid
-    ))
+        .await?,
+    )
     .await?;
-    if let Some(channel) = GuildSettings::get(&mut conn, guild_id, "moderation_log_channel") {
-        send_moderation_logs_with_database_records(
-            &mut conn,
-            &cx,
-            guild_id,
-            ChannelId::new(channel.parse().unwrap()),
-            [log],
-        )
-        .await?;
+    Ok(())
+}
+
+#[poise::command(context_menu_command = "Flood", ephemeral)]
+pub async fn flood_with_interaction(cx: Context<'_>, user: User) -> Result<(), Error> {
+    if let PoiseContext::Application(cx) = cx {
+        cx.interaction
+            .create_response(
+                &cx,
+                CreateInteractionResponse::Modal(
+                    CreateModal::new(
+                        format!("flood:{}", user.id),
+                        format!("Flood @{}", user.name),
+                    )
+                    .components(vec![
+                        CreateActionRow::InputText(
+                            CreateInputText::new(
+                                serenity::all::InputTextStyle::Short,
+                                "Reason",
+                                "reason",
+                            )
+                            .required(false)
+                            .placeholder("Leave blank for no reason"),
+                        ),
+                        CreateActionRow::InputText(
+                            CreateInputText::new(
+                                serenity::all::InputTextStyle::Short,
+                                "Duration",
+                                "duration",
+                            )
+                            .placeholder("e.g. 2h30m"),
+                        ),
+                    ]),
+                ),
+            )
+            .await?;
     }
     Ok(())
 }

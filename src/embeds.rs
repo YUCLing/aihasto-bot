@@ -9,10 +9,7 @@ impl From<ModerationLog> for CreateEmbed {
             .create_embed()
             .description(value.reason.unwrap_or("No reason given.".to_string()))
             .field("User", format!("<@{}>", value.member), true)
-            .footer(CreateEmbedFooter::new(format!(
-                "ID: {}",
-                value.id
-            )));
+            .footer(CreateEmbedFooter::new(format!("ID: {}", value.id)));
         if let Some(actor) = value.actor {
             embed = embed.field("Moderator", format!("<@{}>", actor), true);
         }

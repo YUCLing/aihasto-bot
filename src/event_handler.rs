@@ -9,7 +9,7 @@ use serenity::{
 
 use crate::{
     data::ConnectionPoolKey,
-    features::{message_change_log, moderation_log, temp_voice},
+    features::{message_change_log, moderation, moderation_log, temp_voice},
     schema::voice_channels,
 };
 
@@ -110,7 +110,11 @@ impl EventHandler for Handler {
     }
 
     async fn interaction_create(&self, cx: Context, interaction: Interaction) {
-        tokio::spawn(temp_voice::handle_interaction(cx, interaction));
+        tokio::spawn(temp_voice::handle_interaction(
+            cx.clone(),
+            interaction.clone(),
+        ));
+        tokio::spawn(moderation::handle_interaction(cx, interaction));
     }
 
     async fn voice_state_update(&self, cx: Context, _old: Option<VoiceState>, new: VoiceState) {

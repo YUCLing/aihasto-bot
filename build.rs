@@ -13,5 +13,11 @@ fn main() {
     if let Ok(hash) = get_current_commit_hash() {
         println!("cargo::rustc-env=BUILD_COMMIT={}", hash);
     }
-    println!("cargo::rustc-env=BUILD_TIME={}", time::SystemTime::now().duration_since(time::UNIX_EPOCH).unwrap().as_secs());
+    println!(
+        "cargo::rustc-env=BUILD_TIME={}",
+        time::SystemTime::now()
+            .duration_since(time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+    );
 }

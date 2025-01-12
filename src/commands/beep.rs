@@ -26,7 +26,7 @@ pub async fn beep(cx: Context<'_>) -> Result<(), Error> {
                     ),
                     true,
                 ),
-                ("Built at", format!("<t:{}>", env!("BUILD_TIME")), false)
+                ("Built at", format!("<t:{}>", env!("BUILD_TIME")), false),
             ])
             .thumbnail(
                 current_user

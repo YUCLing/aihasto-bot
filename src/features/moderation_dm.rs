@@ -13,10 +13,7 @@ pub fn generate_dm_message<T: Into<ChannelId>>(
         .author(moderator.clone().into())
         .description(log.reason.clone().unwrap_or("No reason given.".to_string()))
         .field("Moderator", format!("<@{}>", moderator.id.get()), true)
-        .footer(CreateEmbedFooter::new(format!(
-            "ID: {}",
-            log.id
-        )));
+        .footer(CreateEmbedFooter::new(format!("ID: {}", log.id)));
     if let Some(channel) = channel {
         embed = embed.field("Channel", format!("<#{}>", channel.into().get()), true);
     }
