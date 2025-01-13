@@ -44,19 +44,7 @@ fn acquire_cache_http() -> CacheHttpHolder {
         .clone()
 }
 
-#[tokio::main]
-async fn main() {
-    // behavior of logger can be configured with environment variables,
-    // so loads .env before setting up the logger.
-    if let Err(err) = dotenvy::dotenv() {
-        if !err.not_found() {
-            panic!("{err}");
-        }
-    }
-
-    setup_logger().expect("Unable to setup logger.");
-    setup_panic_logger_hook();
-
+async fn async_main() {
     let token = env::var("DISCORD_TOKEN").expect("Discord Bot token is required.");
     let db_url = env::var("DATABASE_URL").expect("Database URL is required.");
 
@@ -153,4 +141,44 @@ async fn main() {
     if let Err(err) = client.start().await {
         log::error!("Client error: {err:?}");
     }
+}
+
+fn main() {
+    // behavior of logger can be configured with environment variables,
+    // so loads .env before setting up the logger.
+    if let Err(err) = dotenvy::dotenv() {
+        if !err.not_found() {
+            panic!("{err}");
+        }
+    }
+
+    setup_logger().expect("Unable to setup logger.");
+    setup_panic_logger_hook();
+
+    let _guard;
+    if let Ok(sentry_dsn) = env::var("SENTRY_DSN") {
+        _guard = sentry::init((
+            sentry_dsn,
+            sentry::ClientOptions {
+                release: Some(
+                    format!(
+                        "{}@{}{}",
+                        env!("CARGO_PKG_NAME"),
+                        env!("CARGO_PKG_VERSION"),
+                        option_env!("BUILD_COMMIT")
+                            .map(|x| format!("+{}", x))
+                            .unwrap_or_default()
+                    )
+                    .into(),
+                ),
+                ..Default::default()
+            },
+        ));
+    }
+
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async_main());
 }

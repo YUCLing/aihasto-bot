@@ -22,7 +22,9 @@ pub async fn beep(cx: Context<'_>) -> Result<(), Error> {
                     "Build",
                     format!(
                         "`{}`",
-                        &option_env!("BUILD_COMMIT").unwrap_or("unknown")[0..7]
+                        option_env!("BUILD_COMMIT")
+                            .map(|x| &x[0..7])
+                            .unwrap_or("unknown")
                     ),
                     true,
                 ),

@@ -17,6 +17,7 @@ lazy_static = "1.5.0"
 log = "0.4.24"
 poise = "0.6.1"
 r2d2 = "0.8.10"
+sentry = { version = "0.36.0", features = ["backtrace", "contexts", "debug-images", "httpdate", "rustls", "panic", "reqwest", "sentry-backtrace", "sentry-contexts", "sentry-debug-images", "sentry-panic", "tokio"], default-features = false }
 serde = { version = "1.0.217", features = ["derive"] }
 serenity = "0.12.4"
 tokio = { version = "1.42.0", features = ["rt-multi-thread"] }
