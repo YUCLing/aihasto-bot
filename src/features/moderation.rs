@@ -97,8 +97,7 @@ pub async fn flood_impl<T: CacheHttp>(
 
 pub async fn handle_interaction(cx: Context, interaction: Interaction) {
     if let Interaction::Modal(modal) = interaction {
-        let id = modal.data.custom_id.clone();
-        if id.starts_with("flood:") {
+        if let Some(id) = modal.data.custom_id.strip_prefix("flood:") {
             let mut conn = cx
                 .data
                 .read()
@@ -108,7 +107,7 @@ pub async fn handle_interaction(cx: Context, interaction: Interaction) {
                 .get()
                 .unwrap();
             let queue = cx.data.read().await.get::<QueueKey>().unwrap().clone();
-            let user = UserId::new(id.strip_prefix("flood:").unwrap().parse().unwrap());
+            let user = UserId::new(id.parse().unwrap());
             let guild = modal.guild_id.unwrap();
             let member = guild.member(&cx, user).await.unwrap();
             let mut duration = None;
