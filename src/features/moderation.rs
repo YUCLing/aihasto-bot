@@ -192,7 +192,7 @@ pub async fn handle_interaction(cx: Context, interaction: Interaction) {
                                 if !value.is_empty() {
                                     reason = Some(value);
                                 }
-                            },
+                            }
                             "duration" => duration = input.value.clone(),
                             _ => {}
                         }

@@ -3,9 +3,7 @@ use serenity::all::{
     Message, MessageId, MessageUpdateEvent,
 };
 
-use crate::{
-    data::ConnectionPoolKey, models::guild_settings::GuildSettings, util::get_conn_from_serenity,
-};
+use crate::{models::guild_settings::GuildSettings, util::get_conn_from_serenity};
 
 pub async fn handle_message_delete(
     cx: Context,
@@ -108,13 +106,8 @@ pub async fn handle_message_update(
     let Some(guild_id) = event.guild_id else {
         return;
     };
-    let mut conn = cx
-        .data
-        .read()
+    let mut conn = get_conn_from_serenity(&cx)
         .await
-        .get::<ConnectionPoolKey>()
-        .unwrap()
-        .get()
         .expect("Unable to get a database connection.");
     if let Some(log_channel) = GuildSettings::get(&mut conn, guild_id, "message_change_log_channel")
         .map(|x| ChannelId::new(x.parse().unwrap()))
