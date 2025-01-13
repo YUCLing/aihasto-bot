@@ -20,6 +20,42 @@ use crate::{
 
 use super::{moderation_dm::generate_dm_message, temp_role::RemoveTempRole};
 
+pub async fn warning_impl<T: CacheHttp>(
+    cx: &T,
+    conn: &mut Connection,
+    channel: ChannelId,
+    member: Member,
+    actor: &User,
+    reason: Option<String>,
+) -> Result<String, Error> {
+    let guild_id = member.guild_id;
+    let log: ModerationLog = ModerationLog::insert()
+        .values([CreateModerationLog::new(
+            guild_id,
+            ModerationAction::Warning,
+            member.user.id,
+            Some(actor.id),
+            reason.clone(),
+        )])
+        .get_result(conn)?;
+    let uuid = log.id;
+    member
+        .user
+        .dm(&cx, generate_dm_message(&log, actor, Some(channel)))
+        .await?;
+    if let Some(channel) = GuildSettings::get(conn, guild_id, "moderation_log_channel") {
+        send_moderation_logs_with_database_records(
+            conn,
+            &cx,
+            guild_id,
+            ChannelId::new(channel.parse().unwrap()),
+            [log],
+        )
+        .await?;
+    }
+    Ok(format!("The user has been warned.\nCase ID: `{}`", uuid))
+}
+
 pub async fn flood_impl<T: CacheHttp>(
     cx: &T,
     state: (&mut Connection, &AsyncQueue),
@@ -100,7 +136,46 @@ pub async fn flood_impl<T: CacheHttp>(
 
 pub async fn handle_interaction(cx: Context, interaction: Interaction) {
     if let Interaction::Modal(modal) = interaction {
-        if let Some(id) = modal.data.custom_id.strip_prefix("flood:") {
+        if let Some(id) = modal.data.custom_id.strip_prefix("warning:") {
+            let mut conn = get_conn_from_serenity(&cx).await.unwrap();
+            let user = UserId::new(id.parse().unwrap());
+            let guild = modal.guild_id.unwrap();
+            let member = guild.member(&cx, user).await.unwrap();
+            let mut reason = None;
+            for row in &modal.data.components {
+                for comp in &row.components {
+                    if let ActionRowComponent::InputText(input) = comp {
+                        if input.custom_id == "reason" {
+                            let value = input.value.clone().unwrap();
+                            if !value.is_empty() {
+                                reason = Some(value);
+                            }
+                        }
+                    }
+                }
+            }
+            let res = warning_impl(
+                &cx,
+                &mut conn,
+                modal.channel_id,
+                member,
+                &modal.user,
+                reason,
+            )
+            .await
+            .unwrap();
+            modal
+                .create_response(
+                    &cx,
+                    CreateInteractionResponse::Message(
+                        CreateInteractionResponseMessage::new()
+                            .ephemeral(true)
+                            .content(res),
+                    ),
+                )
+                .await
+                .unwrap();
+        } else if let Some(id) = modal.data.custom_id.strip_prefix("flood:") {
             let mut conn = get_conn_from_serenity(&cx).await.unwrap();
             let queue = cx.data.read().await.get::<QueueKey>().unwrap().clone();
             let user = UserId::new(id.parse().unwrap());
@@ -112,7 +187,12 @@ pub async fn handle_interaction(cx: Context, interaction: Interaction) {
                 for comp in &row.components {
                     if let ActionRowComponent::InputText(input) = comp {
                         match input.custom_id.as_ref() {
-                            "reason" => reason = input.value.clone(),
+                            "reason" => {
+                                let value = input.value.clone().unwrap();
+                                if !value.is_empty() {
+                                    reason = Some(value);
+                                }
+                            },
                             "duration" => duration = input.value.clone(),
                             _ => {}
                         }

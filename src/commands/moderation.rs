@@ -11,12 +11,12 @@ use serenity::all::{
 use uuid::Uuid;
 
 use crate::{
-    features::{moderation::flood_impl, moderation_dm::generate_dm_message},
+    features::moderation::{flood_impl, warning_impl},
     models::{
         guild_settings::GuildSettings,
-        moderation_log::{CreateModerationLog, ModerationAction, ModerationLog},
+        moderation_log::{ModerationAction, ModerationLog},
     },
-    util::{parse_duration_to_seconds, send_moderation_logs_with_database_records},
+    util::parse_duration_to_seconds,
     Context, Error,
 };
 
@@ -160,34 +160,34 @@ pub async fn warning(
     #[description = "Reason of warning"] reason: Option<String>,
 ) -> Result<(), Error> {
     let mut conn = cx.data().database.get()?;
-    let guild_id = cx.guild().unwrap().id;
-    let log: ModerationLog = ModerationLog::insert()
-        .values([CreateModerationLog::new(
-            guild_id,
-            ModerationAction::Warning,
-            user.user.id,
-            Some(cx.author().id),
-            reason.clone(),
-        )])
-        .get_result(&mut conn)?;
-    let uuid = log.id;
-    user.user
-        .dm(
-            &cx,
-            generate_dm_message(&log, cx.author(), Some(cx.channel_id())),
-        )
+    cx.say(warning_impl(&cx, &mut conn, cx.channel_id(), user, cx.author(), reason).await?)
         .await?;
-    cx.say(format!("The user has been warned.\nCase ID: `{}`", uuid))
-        .await?;
-    if let Some(channel) = GuildSettings::get(&mut conn, guild_id, "moderation_log_channel") {
-        send_moderation_logs_with_database_records(
-            &mut conn,
-            &cx,
-            guild_id,
-            ChannelId::new(channel.parse().unwrap()),
-            [log],
-        )
-        .await?;
+    Ok(())
+}
+
+#[poise::command(context_menu_command = "Warning", ephemeral)]
+pub async fn warning_with_interaction(cx: Context<'_>, user: User) -> Result<(), Error> {
+    if let PoiseContext::Application(cx) = cx {
+        cx.interaction
+            .create_response(
+                &cx,
+                CreateInteractionResponse::Modal(
+                    CreateModal::new(
+                        format!("warning:{}", user.id),
+                        format!("Warning @{}", user.name),
+                    )
+                    .components(vec![CreateActionRow::InputText(
+                        CreateInputText::new(
+                            serenity::all::InputTextStyle::Short,
+                            "Reason",
+                            "reason",
+                        )
+                        .required(false)
+                        .placeholder("Leave blank for no reason"),
+                    )]),
+                ),
+            )
+            .await?;
     }
     Ok(())
 }
