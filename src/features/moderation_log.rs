@@ -5,12 +5,12 @@ use serenity::all::{
 };
 
 use crate::{
-    data::{ConnectionPoolKey, QueueKey},
+    data::QueueKey,
     models::{
         guild_settings::GuildSettings,
         moderation_log::{CreateModerationLog, ModerationAction, ModerationLog},
     },
-    util::send_moderation_logs_with_database_records,
+    util::{get_conn_from_serenity, send_moderation_logs_with_database_records},
 };
 
 use super::{moderation_dm::generate_dm_message, temp_role::RemoveTempRole};
@@ -44,15 +44,9 @@ pub async fn guild_audit_log_entry_create(cx: Context, entry: AuditLogEntry, gui
                     let cx = cx.clone();
                     let reason = entry.reason.clone();
                     tokio::spawn(async move {
-                        let mut conn = {
-                            cx.data
-                                .read()
-                                .await
-                                .get::<ConnectionPoolKey>()
-                                .unwrap()
-                                .get()
-                        }
-                        .expect("Unable to get database connection.");
+                        let mut conn = get_conn_from_serenity(&cx)
+                            .await
+                            .expect("Unable to get database connection.");
                         let logs = ModerationLog::insert()
                             .values([CreateModerationLog::new(
                                 guild_id,
@@ -90,15 +84,9 @@ pub async fn guild_audit_log_entry_create(cx: Context, entry: AuditLogEntry, gui
             }
         }
         Action::Member(MemberAction::BanAdd) => {
-            let mut conn = {
-                cx.data
-                    .read()
-                    .await
-                    .get::<ConnectionPoolKey>()
-                    .unwrap()
-                    .get()
-            }
-            .expect("Unable to get database connection.");
+            let mut conn = get_conn_from_serenity(&cx)
+                .await
+                .expect("Unable to get database connection.");
             let logs = ModerationLog::insert()
                 .values([CreateModerationLog::new(
                     guild_id,

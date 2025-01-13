@@ -6,12 +6,15 @@ use serenity::all::{
 };
 
 use crate::{
-    data::{ConnectionPoolKey, QueueKey},
+    data::QueueKey,
     models::{
         guild_settings::GuildSettings,
         moderation_log::{CreateModerationLog, ModerationAction, ModerationLog},
     },
-    util::{parse_duration_to_seconds, send_moderation_logs_with_database_records},
+    util::{
+        get_conn_from_serenity, parse_duration_to_seconds,
+        send_moderation_logs_with_database_records,
+    },
     Connection, Error,
 };
 
@@ -98,14 +101,7 @@ pub async fn flood_impl<T: CacheHttp>(
 pub async fn handle_interaction(cx: Context, interaction: Interaction) {
     if let Interaction::Modal(modal) = interaction {
         if let Some(id) = modal.data.custom_id.strip_prefix("flood:") {
-            let mut conn = cx
-                .data
-                .read()
-                .await
-                .get::<ConnectionPoolKey>()
-                .unwrap()
-                .get()
-                .unwrap();
+            let mut conn = get_conn_from_serenity(&cx).await.unwrap();
             let queue = cx.data.read().await.get::<QueueKey>().unwrap().clone();
             let user = UserId::new(id.parse().unwrap());
             let guild = modal.guild_id.unwrap();

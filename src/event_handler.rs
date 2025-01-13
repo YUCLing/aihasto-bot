@@ -8,9 +8,9 @@ use serenity::{
 };
 
 use crate::{
-    data::ConnectionPoolKey,
     features::{message_change_log, moderation, moderation_log, temp_voice},
     schema::voice_channels,
+    util::get_conn_from_serenity,
 };
 
 pub struct Handler;
@@ -40,9 +40,7 @@ impl EventHandler for Handler {
     ) {
         if channel.kind == ChannelType::Voice {
             // try delete voice channel record.
-            let lck = cx.data.read().await;
-            let pool = lck.get::<ConnectionPoolKey>().unwrap();
-            if let Ok(mut conn) = pool.get() {
+            if let Ok(mut conn) = get_conn_from_serenity(&cx).await {
                 delete(voice_channels::table)
                     .filter(
                         voice_channels::id.eq(TryInto::<i64>::try_into(channel.id.get()).unwrap()),

@@ -16,6 +16,7 @@ use crate::{
         voice_channel::{CreateVoiceChannel, VoiceChannel},
     },
     schema::voice_channels,
+    util::get_conn_from_serenity,
     Connection, Error,
 };
 
@@ -175,8 +176,7 @@ pub async fn handle_interaction(cx: Context, interaction: Interaction) {
     if let Interaction::Component(interaction) = interaction {
         let id = interaction.data.custom_id.clone();
         if id == *"voice_kick_user" {
-            let lck = cx.data.read().await;
-            let mut conn = lck.get::<ConnectionPoolKey>().unwrap().get().unwrap();
+            let mut conn = get_conn_from_serenity(&cx).await.unwrap();
             let msg = interaction.message.clone();
             let channel_id = msg.channel_id;
             let results = voice_channels::table

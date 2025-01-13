@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use diesel::{ExpressionMethods, RunQueryDsl};
-use serenity::all::{CacheHttp, ChannelId, CreateMessage, GuildId, Message};
+use serenity::all::{CacheHttp, ChannelId, Context, CreateMessage, GuildId, Message};
 
-use crate::{models::moderation_log::ModerationLog, Connection, Error};
+use crate::{data::ConnectionPoolKey, models::moderation_log::ModerationLog, Connection, Error};
 
 pub fn parse_duration_to_seconds<T: AsRef<str>>(duration: T) -> Result<u64, String> {
     let mut total_seconds = 0;
@@ -46,6 +46,16 @@ pub fn parse_duration_to_seconds<T: AsRef<str>>(duration: T) -> Result<u64, Stri
     }
 
     Ok(total_seconds)
+}
+
+pub async fn get_conn_from_serenity(cx: &Context) -> Result<Connection, Error> {
+    Ok(cx
+        .data
+        .read()
+        .await
+        .get::<ConnectionPoolKey>()
+        .unwrap()
+        .get()?)
 }
 
 pub async fn send_moderation_logs<
