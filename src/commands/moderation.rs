@@ -165,7 +165,7 @@ pub async fn warning(
     Ok(())
 }
 
-#[poise::command(context_menu_command = "Warning", ephemeral)]
+#[poise::command(context_menu_command = "Warning", ephemeral, default_member_permissions = "MUTE_MEMBERS")]
 pub async fn warning_with_interaction(cx: Context<'_>, user: User) -> Result<(), Error> {
     if let PoiseContext::Application(cx) = cx {
         cx.interaction
@@ -218,7 +218,7 @@ pub async fn flood(
     Ok(())
 }
 
-#[poise::command(context_menu_command = "Flood", ephemeral)]
+#[poise::command(context_menu_command = "Flood", ephemeral, default_member_permissions = "MUTE_MEMBERS")]
 pub async fn flood_with_interaction(cx: Context<'_>, user: User) -> Result<(), Error> {
     if let PoiseContext::Application(cx) = cx {
         cx.interaction
