@@ -56,8 +56,13 @@ pub async fn create_temp_voice_channel<U: CacheHttp, V: Into<GuildId>, W: AsRef<
 }
 
 pub async fn handle_voice_state_update(cx: Context, new: VoiceState) {
-    let lck = cx.data.read().await;
-    let pool = lck.get::<ConnectionPoolKey>().unwrap();
+    let pool = cx
+        .data
+        .read()
+        .await
+        .get::<ConnectionPoolKey>()
+        .unwrap()
+        .clone();
     let mut conn = pool.get().unwrap();
     if let Some(channel_id) = new.channel_id {
         let guild_id = new.guild_id.unwrap();
@@ -77,7 +82,6 @@ pub async fn handle_voice_state_update(cx: Context, new: VoiceState) {
                     .select(VoiceChannel::as_select())
                     .load(&mut conn)
                     .unwrap();
-                let mut co_conn = pool.get().unwrap(); // get a connection for coroutine
                 let create_channel_and_move_user = async {
                     let parent_channel = channel_id
                         .to_channel(&cx)
@@ -86,8 +90,9 @@ pub async fn handle_voice_state_update(cx: Context, new: VoiceState) {
                         .guild()
                         .unwrap()
                         .parent_id;
+                    let mut conn = pool.get().unwrap();
                     match create_temp_voice_channel(
-                        &mut co_conn,
+                        &mut conn,
                         &cx,
                         &guild_id,
                         &member.user,
