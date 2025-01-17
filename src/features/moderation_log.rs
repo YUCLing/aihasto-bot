@@ -10,7 +10,7 @@ use crate::{
         guild_settings::GuildSettings,
         moderation_log::{CreateModerationLog, ModerationAction, ModerationLog},
     },
-    util::{get_conn_from_serenity, send_moderation_logs_with_database_records},
+    util::{get_pool_from_serenity, send_moderation_logs_with_database_records},
 };
 
 use super::{moderation_dm::generate_dm_message, temp_role::RemoveTempRole};
@@ -44,9 +44,7 @@ pub async fn guild_audit_log_entry_create(cx: Context, entry: AuditLogEntry, gui
                     let cx = cx.clone();
                     let reason = entry.reason.clone();
                     tokio::spawn(async move {
-                        let mut conn = get_conn_from_serenity(&cx)
-                            .await
-                            .expect("Unable to get database connection.");
+                        let pool = get_pool_from_serenity(&cx).await;
                         let logs = ModerationLog::insert()
                             .values([CreateModerationLog::new(
                                 guild_id,
@@ -55,7 +53,7 @@ pub async fn guild_audit_log_entry_create(cx: Context, entry: AuditLogEntry, gui
                                 Some(entry.user_id),
                                 reason,
                             )])
-                            .get_results(&mut conn)
+                            .get_results(&mut pool.get().unwrap())
                             .expect("Unable to log timeout.");
                         let target = UserId::new(entry.target_id.unwrap().get());
                         if let Ok(moderator) = entry.user_id.to_user(&cx).await {
@@ -70,12 +68,14 @@ pub async fn guild_audit_log_entry_create(cx: Context, entry: AuditLogEntry, gui
                                 )
                                 .await;
                         }
-                        if let Some(channel) =
-                            GuildSettings::get(&mut conn, guild_id, "moderation_log_channel")
-                        {
+                        if let Some(channel) = GuildSettings::get(
+                            &mut pool.get().unwrap(),
+                            guild_id,
+                            "moderation_log_channel",
+                        ) {
                             let channel = ChannelId::new(channel.parse().unwrap());
                             let _ = send_moderation_logs_with_database_records(
-                                &mut conn, &cx, guild_id, channel, logs,
+                                &pool, &cx, guild_id, channel, logs,
                             )
                             .await;
                         }
@@ -84,9 +84,7 @@ pub async fn guild_audit_log_entry_create(cx: Context, entry: AuditLogEntry, gui
             }
         }
         Action::Member(MemberAction::BanAdd) => {
-            let mut conn = get_conn_from_serenity(&cx)
-                .await
-                .expect("Unable to get database connection.");
+            let pool = get_pool_from_serenity(&cx).await;
             let logs = ModerationLog::insert()
                 .values([CreateModerationLog::new(
                     guild_id,
@@ -95,12 +93,13 @@ pub async fn guild_audit_log_entry_create(cx: Context, entry: AuditLogEntry, gui
                     Some(entry.user_id),
                     entry.reason,
                 )])
-                .get_results(&mut conn)
+                .get_results(&mut pool.get().unwrap())
                 .expect("Unable to log ban.");
-            if let Some(channel) = GuildSettings::get(&mut conn, guild_id, "moderation_log_channel")
+            if let Some(channel) =
+                GuildSettings::get(&mut pool.get().unwrap(), guild_id, "moderation_log_channel")
             {
                 let channel = ChannelId::new(channel.parse().unwrap());
-                send_moderation_logs_with_database_records(&mut conn, &cx, guild_id, channel, logs)
+                send_moderation_logs_with_database_records(&pool, &cx, guild_id, channel, logs)
                     .await
                     .expect("Unable to send moderation logs.");
             }

@@ -12,17 +12,17 @@ use crate::{
         moderation_log::{CreateModerationLog, ModerationAction, ModerationLog},
     },
     util::{
-        get_conn_from_serenity, parse_duration_to_seconds,
+        get_pool_from_serenity, parse_duration_to_seconds,
         send_moderation_logs_with_database_records,
     },
-    Connection, Error,
+    ConnectionPool, Error,
 };
 
 use super::{moderation_dm::generate_dm_message, temp_role::RemoveTempRole};
 
 pub async fn warning_impl<T: CacheHttp>(
     cx: &T,
-    conn: &mut Connection,
+    pool: &ConnectionPool,
     channel: ChannelId,
     member: Member,
     actor: &User,
@@ -37,15 +37,16 @@ pub async fn warning_impl<T: CacheHttp>(
             Some(actor.id),
             reason.clone(),
         )])
-        .get_result(conn)?;
+        .get_result(&mut pool.get()?)?;
     let uuid = log.id;
     member
         .user
         .dm(&cx, generate_dm_message(&log, actor, Some(channel)))
         .await?;
-    if let Some(channel) = GuildSettings::get(conn, guild_id, "moderation_log_channel") {
+    if let Some(channel) = GuildSettings::get(&mut pool.get()?, guild_id, "moderation_log_channel")
+    {
         send_moderation_logs_with_database_records(
-            conn,
+            pool,
             &cx,
             guild_id,
             ChannelId::new(channel.parse().unwrap()),
@@ -58,7 +59,7 @@ pub async fn warning_impl<T: CacheHttp>(
 
 pub async fn flood_impl<T: CacheHttp>(
     cx: &T,
-    state: (&mut Connection, &AsyncQueue),
+    state: (&ConnectionPool, &AsyncQueue),
     channel: ChannelId,
     member: Member,
     actor: &User,
@@ -75,7 +76,7 @@ pub async fn flood_impl<T: CacheHttp>(
         return Ok("Invalid duration".to_string());
     }
     let guild_id = member.guild_id;
-    let Some(flooder_role) = GuildSettings::get(state.0, guild_id, "flooder_role")
+    let Some(flooder_role) = GuildSettings::get(&mut state.0.get()?, guild_id, "flooder_role")
         .map(|x| RoleId::new(x.parse().unwrap()))
     else {
         return Ok("Flooder is disabled.".to_string());
@@ -110,13 +111,15 @@ pub async fn flood_impl<T: CacheHttp>(
             Some(actor.id),
             reason.clone(),
         )])
-        .get_result(state.0)?;
+        .get_result(&mut state.0.get()?)?;
     let uuid = log.id;
     member
         .user
         .dm(&cx, generate_dm_message(&log, actor, Some(channel)))
         .await?;
-    if let Some(channel) = GuildSettings::get(state.0, guild_id, "moderation_log_channel") {
+    if let Some(channel) =
+        GuildSettings::get(&mut state.0.get()?, guild_id, "moderation_log_channel")
+    {
         send_moderation_logs_with_database_records(
             state.0,
             &cx,
@@ -155,7 +158,7 @@ pub async fn handle_interaction(cx: Context, interaction: Interaction) {
             }
             let res = warning_impl(
                 &cx,
-                &mut get_conn_from_serenity(&cx).await.unwrap(),
+                &get_pool_from_serenity(&cx).await,
                 modal.channel_id,
                 member,
                 &modal.user,
@@ -199,7 +202,7 @@ pub async fn handle_interaction(cx: Context, interaction: Interaction) {
             }
             let res = flood_impl(
                 &cx,
-                (&mut get_conn_from_serenity(&cx).await.unwrap(), &queue),
+                (&get_pool_from_serenity(&cx).await, &queue),
                 modal.channel_id,
                 member,
                 &modal.user,

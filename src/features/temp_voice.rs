@@ -16,8 +16,8 @@ use crate::{
         voice_channel::{CreateVoiceChannel, VoiceChannel},
     },
     schema::voice_channels,
-    util::get_conn_from_serenity,
-    Connection, Error,
+    util::get_pool_from_serenity,
+    ConnectionPool, Error,
 };
 
 pub fn default_channel_name_for_member(member: &Member) -> String {
@@ -28,7 +28,7 @@ pub fn default_channel_name_for_member(member: &Member) -> String {
 }
 
 pub async fn create_temp_voice_channel<U: CacheHttp, V: Into<GuildId>, W: AsRef<str>>(
-    conn: &mut Connection,
+    pool: &ConnectionPool,
     http: &U,
     guild: V,
     creator: &User,
@@ -48,7 +48,7 @@ pub async fn create_temp_voice_channel<U: CacheHttp, V: Into<GuildId>, W: AsRef<
         Ok(channel) => {
             insert_into(voice_channels::table)
                 .values(&[CreateVoiceChannel::new(&channel, guild, creator)])
-                .execute(conn)?;
+                .execute(&mut pool.get()?)?;
             Ok(channel)
         }
         Err(err) => Err(Box::new(err)),
@@ -90,7 +90,7 @@ pub async fn handle_voice_state_update(cx: Context, new: VoiceState) {
                         .unwrap()
                         .parent_id;
                     match create_temp_voice_channel(
-                        &mut pool.get().unwrap(),
+                        &pool,
                         &cx,
                         &guild_id,
                         &member.user,
@@ -188,7 +188,7 @@ pub async fn handle_interaction(cx: Context, interaction: Interaction) {
                         .eq(TryInto::<i64>::try_into(interaction.user.id.get()).unwrap()),
                 )
                 .select(VoiceChannel::as_select())
-                .load(&mut get_conn_from_serenity(&cx).await.unwrap())
+                .load(&mut get_pool_from_serenity(&cx).await.get().unwrap())
                 .unwrap();
             if results.is_empty() {
                 // this is quite impossible, is it really necessary?

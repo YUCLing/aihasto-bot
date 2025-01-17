@@ -3,7 +3,7 @@ use serenity::all::{
     Message, MessageId, MessageUpdateEvent,
 };
 
-use crate::{models::guild_settings::GuildSettings, util::get_conn_from_serenity};
+use crate::{models::guild_settings::GuildSettings, util::get_pool_from_serenity};
 
 pub async fn handle_message_delete(
     cx: Context,
@@ -22,11 +22,17 @@ pub async fn handle_message_delete(
         // we missed out the message...
         return;
     };
-    if let Some(log_channel) = GuildSettings::get(&mut get_conn_from_serenity(&cx)
-    .await
-    .expect("Unable to get a database connection."), guild_id, "message_change_log_channel")
-        .map(|x| ChannelId::new(x.parse().unwrap()))
+    if let Some(log_channel) = GuildSettings::get(
+        &mut get_pool_from_serenity(&cx)
+            .await
+            .get()
+            .expect("Unable to get a database connection."),
+        guild_id,
+        "message_change_log_channel",
+    )
+    .map(|x| ChannelId::new(x.parse().unwrap()))
     {
+        let mut footer = vec![format!("ID: {}", cached_msg.id)];
         let mut embed = CreateEmbed::new()
             .color(Colour::RED)
             .title("Message Deleted")
@@ -42,21 +48,19 @@ pub async fn handle_message_delete(
             .author(cached_msg.author.into())
             .description(cached_msg.content);
         if !cached_msg.attachments.is_empty() {
-            embed = embed
-                .field(
-                    "Attachments",
-                    cached_msg
-                        .attachments
-                        .iter()
-                        .map(|x| x.url.clone())
-                        .collect::<Vec<String>>()
-                        .join("\n"),
-                    false,
-                )
-                .footer(CreateEmbedFooter::new(
-                    "Attachments may already deleted by Discord.",
-                ));
+            embed = embed.field(
+                "Attachments",
+                cached_msg
+                    .attachments
+                    .iter()
+                    .map(|x| x.url.clone())
+                    .collect::<Vec<String>>()
+                    .join("\n"),
+                false,
+            );
+            footer.push("Attachments may already deleted by Discord.".to_string());
         }
+        embed = embed.footer(CreateEmbedFooter::new(footer.join(" • ")));
         tokio::spawn(log_channel.send_message(cx.clone(), CreateMessage::new().embed(embed)));
     }
 }
@@ -105,15 +109,21 @@ pub async fn handle_message_update(
     let Some(guild_id) = event.guild_id else {
         return;
     };
-    if let Some(log_channel) = GuildSettings::get(&mut get_conn_from_serenity(&cx)
-    .await
-    .expect("Unable to get a database connection."), guild_id, "message_change_log_channel")
-        .map(|x| ChannelId::new(x.parse().unwrap()))
+    if let Some(log_channel) = GuildSettings::get(
+        &mut get_pool_from_serenity(&cx)
+            .await
+            .get()
+            .expect("Unable to get a database connection."),
+        guild_id,
+        "message_change_log_channel",
+    )
+    .map(|x| ChannelId::new(x.parse().unwrap()))
     {
         let author = event
             .author
             .expect("Why an edited message doesn't have an author.");
         let removed_attachments = find_attachments_diff(old_message.attachments, msg.attachments);
+        let mut footer = vec![format!("ID: {}", msg.id)];
         let mut embed = CreateEmbed::new()
             .color(Colour::ORANGE)
             .title("Message Edited")
@@ -139,20 +149,18 @@ pub async fn handle_message_update(
                 "_No content changes._".to_string()
             });
         if !removed_attachments.is_empty() {
-            embed = embed
-                .field(
-                    "Removed Attachments",
-                    removed_attachments
-                        .iter()
-                        .map(|x| x.url.clone())
-                        .collect::<Vec<String>>()
-                        .join("\n"),
-                    false,
-                )
-                .footer(CreateEmbedFooter::new(
-                    "Attachments may already deleted by Discord.",
-                ));
+            embed = embed.field(
+                "Removed Attachments",
+                removed_attachments
+                    .iter()
+                    .map(|x| x.url.clone())
+                    .collect::<Vec<String>>()
+                    .join("\n"),
+                false,
+            );
+            footer.push("Attachments may already deleted by Discord.".to_string());
         }
+        embed = embed.footer(CreateEmbedFooter::new(footer.join(" • ")));
         log_channel
             .send_message(cx.clone(), CreateMessage::new().embed(embed))
             .await

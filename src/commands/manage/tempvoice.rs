@@ -29,7 +29,12 @@ pub async fn set_channel(
         ))
         .await?;
     } else {
-        GuildSettings::set(&mut cx.data().database.get()?, guild, "creator_voice_channel", None::<String>)?;
+        GuildSettings::set(
+            &mut cx.data().database.get()?,
+            guild,
+            "creator_voice_channel",
+            None::<String>,
+        )?;
         cx.say("The temporary voice channel creation has been disabled.")
             .await?;
     }

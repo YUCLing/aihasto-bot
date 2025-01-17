@@ -161,8 +161,18 @@ pub async fn warning(
     #[description = "The user that receives the warning"] user: Member,
     #[description = "Reason of warning"] reason: Option<String>,
 ) -> Result<(), Error> {
-    cx.say(warning_impl(&cx, &mut cx.data().database.get()?, cx.channel_id(), user, cx.author(), reason).await?)
-        .await?;
+    cx.say(
+        warning_impl(
+            &cx,
+            &cx.data().database,
+            cx.channel_id(),
+            user,
+            cx.author(),
+            reason,
+        )
+        .await?,
+    )
+    .await?;
     Ok(())
 }
 
@@ -205,12 +215,11 @@ pub async fn flood(
     #[description = "The duration that user will be the Flooder"] duration: String,
     #[description = "Reason of making the user a Flooder"] reason: Option<String>,
 ) -> Result<(), Error> {
-    let mut conn = cx.data().database.get()?;
     let queue = &cx.data().queue;
     cx.say(
         flood_impl(
             &cx,
-            (&mut conn, queue),
+            (&cx.data().database, queue),
             cx.channel_id(),
             user,
             cx.author(),

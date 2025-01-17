@@ -10,7 +10,7 @@ use serenity::{
 use crate::{
     features::{message_change_log, moderation, moderation_log, temp_voice},
     schema::voice_channels,
-    util::get_conn_from_serenity,
+    util::get_pool_from_serenity,
 };
 
 pub struct Handler;
@@ -40,7 +40,7 @@ impl EventHandler for Handler {
     ) {
         if channel.kind == ChannelType::Voice {
             // try delete voice channel record.
-            if let Ok(mut conn) = get_conn_from_serenity(&cx).await {
+            if let Ok(mut conn) = get_pool_from_serenity(&cx).await.get() {
                 delete(voice_channels::table)
                     .filter(
                         voice_channels::id.eq(TryInto::<i64>::try_into(channel.id.get()).unwrap()),

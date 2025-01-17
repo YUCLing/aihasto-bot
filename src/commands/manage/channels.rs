@@ -32,7 +32,12 @@ pub async fn set_moderation_log_channel(
         ))
         .await?;
     } else {
-        GuildSettings::set(&mut cx.data().database.get()?, guild, "moderation_log_channel", None::<String>)?;
+        GuildSettings::set(
+            &mut cx.data().database.get()?,
+            guild,
+            "moderation_log_channel",
+            None::<String>,
+        )?;
         cx.say("The moderation log channel creation has been disabled.")
             .await?;
     }

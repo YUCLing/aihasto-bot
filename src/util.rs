@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use diesel::{ExpressionMethods, RunQueryDsl};
 use serenity::all::{CacheHttp, ChannelId, Context, CreateMessage, GuildId, Message};
 
-use crate::{data::ConnectionPoolKey, models::moderation_log::ModerationLog, Connection, Error};
+use crate::{
+    data::ConnectionPoolKey, models::moderation_log::ModerationLog, ConnectionPool, Error,
+};
 
 pub fn parse_duration_to_seconds<T: AsRef<str>>(duration: T) -> Result<u64, String> {
     let mut total_seconds = 0;
@@ -48,14 +50,13 @@ pub fn parse_duration_to_seconds<T: AsRef<str>>(duration: T) -> Result<u64, Stri
     Ok(total_seconds)
 }
 
-pub async fn get_conn_from_serenity(cx: &Context) -> Result<Connection, Error> {
-    Ok(cx
-        .data
+pub async fn get_pool_from_serenity(cx: &Context) -> ConnectionPool {
+    cx.data
         .read()
         .await
         .get::<ConnectionPoolKey>()
         .unwrap()
-        .get()?)
+        .clone()
 }
 
 pub async fn send_moderation_logs<
@@ -84,7 +85,7 @@ pub async fn send_moderation_logs_with_database_records<
     V: Into<ChannelId>,
     W: IntoIterator<Item = ModerationLog>,
 >(
-    conn: &mut Connection,
+    pool: &ConnectionPool,
     cx: &T,
     guild_id: U,
     channel_id: V,
@@ -108,6 +109,6 @@ pub async fn send_moderation_logs_with_database_records<
                 })
                 .collect::<Vec<_>>(),
         )
-        .execute(conn)?;
+        .execute(&mut pool.get()?)?;
     Ok(map)
 }
