@@ -137,7 +137,6 @@ pub async fn flood_impl<T: CacheHttp>(
 pub async fn handle_interaction(cx: Context, interaction: Interaction) {
     if let Interaction::Modal(modal) = interaction {
         if let Some(id) = modal.data.custom_id.strip_prefix("warning:") {
-            let mut conn = get_conn_from_serenity(&cx).await.unwrap();
             let user = UserId::new(id.parse().unwrap());
             let guild = modal.guild_id.unwrap();
             let member = guild.member(&cx, user).await.unwrap();
@@ -156,7 +155,7 @@ pub async fn handle_interaction(cx: Context, interaction: Interaction) {
             }
             let res = warning_impl(
                 &cx,
-                &mut conn,
+                &mut get_conn_from_serenity(&cx).await.unwrap(),
                 modal.channel_id,
                 member,
                 &modal.user,
@@ -176,7 +175,6 @@ pub async fn handle_interaction(cx: Context, interaction: Interaction) {
                 .await
                 .unwrap();
         } else if let Some(id) = modal.data.custom_id.strip_prefix("flood:") {
-            let mut conn = get_conn_from_serenity(&cx).await.unwrap();
             let queue = cx.data.read().await.get::<QueueKey>().unwrap().clone();
             let user = UserId::new(id.parse().unwrap());
             let guild = modal.guild_id.unwrap();
@@ -201,7 +199,7 @@ pub async fn handle_interaction(cx: Context, interaction: Interaction) {
             }
             let res = flood_impl(
                 &cx,
-                (&mut conn, &queue),
+                (&mut get_conn_from_serenity(&cx).await.unwrap(), &queue),
                 modal.channel_id,
                 member,
                 &modal.user,

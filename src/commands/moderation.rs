@@ -81,35 +81,37 @@ pub async fn inspect(
     cx: Context<'_>,
     #[description = "The user to be inspected"] user: User,
 ) -> Result<(), Error> {
-    let mut conn = cx.data().database.get()?;
     let mut warns = 0;
     let mut floods = 0;
     let mut timeouts = 0;
     let mut bans = 0;
-    for result in {
-        use crate::schema::moderation_log::*;
-        use diesel::dsl::*;
-        table
-            .filter(ModerationLog::by_user(user.clone()))
-            .group_by(kind)
-            .select((kind, count_star()))
-            .load::<(ModerationAction, i64)>(&mut conn)?
-    } {
-        match result.0 {
-            ModerationAction::Warning => warns = result.1,
-            ModerationAction::Flood => floods = result.1,
-            ModerationAction::Timeout => timeouts = result.1,
-            ModerationAction::Ban => bans = result.1,
+    let logs: Vec<CreateEmbed> = {
+        let mut conn = cx.data().database.get()?;
+        for result in {
+            use crate::schema::moderation_log::*;
+            use diesel::dsl::*;
+            table
+                .filter(ModerationLog::by_user(user.clone()))
+                .group_by(kind)
+                .select((kind, count_star()))
+                .load::<(ModerationAction, i64)>(&mut conn)?
+        } {
+            match result.0 {
+                ModerationAction::Warning => warns = result.1,
+                ModerationAction::Flood => floods = result.1,
+                ModerationAction::Timeout => timeouts = result.1,
+                ModerationAction::Ban => bans = result.1,
+            }
         }
-    }
-    let logs: Vec<CreateEmbed> = ModerationLog::all()
-        .filter(ModerationLog::by_user(user.clone()))
-        .order_by(crate::schema::moderation_log::created_at.desc())
-        .limit(5)
-        .load::<ModerationLog>(&mut conn)?
-        .into_iter()
-        .map(|x| x.into())
-        .collect();
+        ModerationLog::all()
+            .filter(ModerationLog::by_user(user.clone()))
+            .order_by(crate::schema::moderation_log::created_at.desc())
+            .limit(5)
+            .load::<ModerationLog>(&mut conn)?
+            .into_iter()
+            .map(|x| x.into())
+            .collect()
+    };
     cx.send(CreateReply {
         content: Some(format!("Moderation logs for <@{}>", user.id.get())),
         embeds: [
@@ -159,8 +161,7 @@ pub async fn warning(
     #[description = "The user that receives the warning"] user: Member,
     #[description = "Reason of warning"] reason: Option<String>,
 ) -> Result<(), Error> {
-    let mut conn = cx.data().database.get()?;
-    cx.say(warning_impl(&cx, &mut conn, cx.channel_id(), user, cx.author(), reason).await?)
+    cx.say(warning_impl(&cx, &mut cx.data().database.get()?, cx.channel_id(), user, cx.author(), reason).await?)
         .await?;
     Ok(())
 }
@@ -302,6 +303,7 @@ pub async fn reason(
                 .get_result(&mut conn)
                 .optional()?
         };
+        std::mem::drop(conn);
         let channel = ChannelId::new(channel.parse().unwrap());
         channel
             .send_message(
@@ -321,6 +323,8 @@ pub async fn reason(
                 },
             )
             .await?;
+    } else {
+        std::mem::drop(conn);
     }
     cx.say("Case has been updated.").await?;
     Ok(())

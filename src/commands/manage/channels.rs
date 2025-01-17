@@ -19,10 +19,9 @@ pub async fn set_moderation_log_channel(
     channel: Option<ChannelId>,
 ) -> Result<(), Error> {
     let guild = cx.guild_id().unwrap();
-    let mut conn = cx.data().database.get()?;
     if let Some(channel) = channel {
         GuildSettings::set(
-            &mut conn,
+            &mut cx.data().database.get()?,
             guild,
             "moderation_log_channel",
             Some(channel.get().to_string()),
@@ -33,7 +32,7 @@ pub async fn set_moderation_log_channel(
         ))
         .await?;
     } else {
-        GuildSettings::set(&mut conn, guild, "moderation_log_channel", None::<String>)?;
+        GuildSettings::set(&mut cx.data().database.get()?, guild, "moderation_log_channel", None::<String>)?;
         cx.say("The moderation log channel creation has been disabled.")
             .await?;
     }
@@ -49,10 +48,9 @@ pub async fn set_message_change_log_channel(
     channel: Option<ChannelId>,
 ) -> Result<(), Error> {
     let guild = cx.guild_id().unwrap();
-    let mut conn = cx.data().database.get()?;
     if let Some(channel) = channel {
         GuildSettings::set(
-            &mut conn,
+            &mut cx.data().database.get()?,
             guild,
             "message_change_log_channel",
             Some(channel.get().to_string()),
@@ -64,7 +62,7 @@ pub async fn set_message_change_log_channel(
         .await?;
     } else {
         GuildSettings::set(
-            &mut conn,
+            &mut cx.data().database.get()?,
             guild,
             "message_change_log_channel",
             None::<String>,

@@ -14,13 +14,12 @@ async fn own_voice_channel_check(cx: Context<'_>) -> Result<bool, Error> {
     let Some(channel) = cx.guild_channel().await else {
         return Ok(false);
     };
-    let mut conn = cx.data().database.get()?;
     let results = voice_channels::table
         .filter(voice_channels::id.eq(TryInto::<i64>::try_into(channel.id.get()).unwrap()))
         .filter(voice_channels::creator.eq(TryInto::<i64>::try_into(cx.author().id.get()).unwrap()))
         .limit(1)
         .select(VoiceChannel::as_select())
-        .load(&mut conn)?;
+        .load(&mut cx.data().database.get()?)?;
     if results.is_empty() {
         cx.send(CreateReply {
             ephemeral: Some(true),
@@ -172,11 +171,10 @@ pub async fn admin_delete(
     #[channel_types("Voice")]
     channel: ChannelId,
 ) -> Result<(), Error> {
-    let mut conn = cx.data().database.get()?;
     let id: Option<i64> = voice_channels::table
         .find(TryInto::<i64>::try_into(channel.get()).unwrap())
         .select(voice_channels::id)
-        .get_result(&mut conn)
+        .get_result(&mut cx.data().database.get()?)
         .optional()?;
     if id.is_none() {
         cx.say("This voice channel is not managed by temp voice.")

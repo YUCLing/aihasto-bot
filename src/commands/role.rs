@@ -27,15 +27,18 @@ async fn is_user_allowed_to_operate_the_role(
     user_roles: &Vec<RoleId>,
     target_role: RoleId,
 ) -> bool {
-    let Ok(mut conn) = cx.data().database.get() else {
-        return false;
-    };
-    let Ok(allowed_operators): Result<Vec<AllowedRole>, _> = allowed_roles::table
-        .filter(allowed_roles::role_id.eq(TryInto::<i64>::try_into(target_role.get()).unwrap()))
-        .select(AllowedRole::as_select())
-        .load(&mut conn)
-    else {
-        return false;
+    let allowed_operators = {
+        let Ok(mut conn) = cx.data().database.get() else {
+            return false;
+        };
+        let Ok(allowed_operators): Result<Vec<AllowedRole>, _> = allowed_roles::table
+            .filter(allowed_roles::role_id.eq(TryInto::<i64>::try_into(target_role.get()).unwrap()))
+            .select(AllowedRole::as_select())
+            .load(&mut conn)
+        else {
+            return false;
+        };
+        allowed_operators
     };
 
     for rule in allowed_operators {

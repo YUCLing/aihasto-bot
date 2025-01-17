@@ -22,10 +22,9 @@ pub async fn handle_message_delete(
         // we missed out the message...
         return;
     };
-    let mut conn = get_conn_from_serenity(&cx)
-        .await
-        .expect("Unable to get a database connection.");
-    if let Some(log_channel) = GuildSettings::get(&mut conn, guild_id, "message_change_log_channel")
+    if let Some(log_channel) = GuildSettings::get(&mut get_conn_from_serenity(&cx)
+    .await
+    .expect("Unable to get a database connection."), guild_id, "message_change_log_channel")
         .map(|x| ChannelId::new(x.parse().unwrap()))
     {
         let mut embed = CreateEmbed::new()
@@ -106,10 +105,9 @@ pub async fn handle_message_update(
     let Some(guild_id) = event.guild_id else {
         return;
     };
-    let mut conn = get_conn_from_serenity(&cx)
-        .await
-        .expect("Unable to get a database connection.");
-    if let Some(log_channel) = GuildSettings::get(&mut conn, guild_id, "message_change_log_channel")
+    if let Some(log_channel) = GuildSettings::get(&mut get_conn_from_serenity(&cx)
+    .await
+    .expect("Unable to get a database connection."), guild_id, "message_change_log_channel")
         .map(|x| ChannelId::new(x.parse().unwrap()))
     {
         let author = event

@@ -63,11 +63,10 @@ pub async fn handle_voice_state_update(cx: Context, new: VoiceState) {
         .get::<ConnectionPoolKey>()
         .unwrap()
         .clone();
-    let mut conn = pool.get().unwrap();
     if let Some(channel_id) = new.channel_id {
         let guild_id = new.guild_id.unwrap();
         let Some(guild_voice_creator) =
-            GuildSettings::get(&mut conn, guild_id, "creator_voice_channel")
+            GuildSettings::get(&mut pool.get().unwrap(), guild_id, "creator_voice_channel")
         else {
             return;
         };
@@ -80,7 +79,7 @@ pub async fn handle_voice_state_update(cx: Context, new: VoiceState) {
                     )
                     .limit(1)
                     .select(VoiceChannel::as_select())
-                    .load(&mut conn)
+                    .load(&mut pool.get().unwrap())
                     .unwrap();
                 let create_channel_and_move_user = async {
                     let parent_channel = channel_id
@@ -90,9 +89,8 @@ pub async fn handle_voice_state_update(cx: Context, new: VoiceState) {
                         .guild()
                         .unwrap()
                         .parent_id;
-                    let mut conn = pool.get().unwrap();
                     match create_temp_voice_channel(
-                        &mut conn,
+                        &mut pool.get().unwrap(),
                         &cx,
                         &guild_id,
                         &member.user,
@@ -145,7 +143,7 @@ pub async fn handle_voice_state_update(cx: Context, new: VoiceState) {
                             // the user's channel no longer exists.
                             delete(voice_channels::table)
                                 .filter(voice_channels::id.eq(created_channels[0].id))
-                                .execute(&mut conn)
+                                .execute(&mut pool.get().unwrap())
                                 .expect("Unable to delete user's voice channel record.");
                             create_channel_and_move_user.await;
                         }
@@ -159,7 +157,7 @@ pub async fn handle_voice_state_update(cx: Context, new: VoiceState) {
         let results = voice_channels::table
             .filter(voice_channels::guild.eq(TryInto::<i64>::try_into(guild_id.get()).unwrap()))
             .select(VoiceChannel::as_select())
-            .load(&mut conn)
+            .load(&mut pool.get().unwrap())
             .unwrap();
         let guild_channels = guild_id.channels(&cx).await.unwrap();
         for voice_channel in results {
@@ -181,7 +179,6 @@ pub async fn handle_interaction(cx: Context, interaction: Interaction) {
     if let Interaction::Component(interaction) = interaction {
         let id = interaction.data.custom_id.clone();
         if id == *"voice_kick_user" {
-            let mut conn = get_conn_from_serenity(&cx).await.unwrap();
             let msg = interaction.message.clone();
             let channel_id = msg.channel_id;
             let results = voice_channels::table
@@ -191,7 +188,7 @@ pub async fn handle_interaction(cx: Context, interaction: Interaction) {
                         .eq(TryInto::<i64>::try_into(interaction.user.id.get()).unwrap()),
                 )
                 .select(VoiceChannel::as_select())
-                .load(&mut conn)
+                .load(&mut get_conn_from_serenity(&cx).await.unwrap())
                 .unwrap();
             if results.is_empty() {
                 // this is quite impossible, is it really necessary?

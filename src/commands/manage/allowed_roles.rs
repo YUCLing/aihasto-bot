@@ -22,7 +22,6 @@ pub async fn add(
 ) -> Result<(), Error> {
     let operator_id = operator.id.get();
     let role_id = role.id.get();
-    let mut conn = cx.data().database.get()?;
     insert_into(allowed_roles::table)
         .values(&[CreateAllowedRole::new(
             cx.guild_id().unwrap(),
@@ -30,7 +29,7 @@ pub async fn add(
             role,
         )])
         .on_conflict_do_nothing()
-        .execute(&mut conn)?;
+        .execute(&mut cx.data().database.get()?)?;
     cx.say(format!(
         "You have allowed <@&{}> to assign/remove <@&{}> to other users.",
         operator_id, role_id
@@ -50,13 +49,12 @@ pub async fn remove(
 ) -> Result<(), Error> {
     let operator_id = operator.id.get();
     let role_id = role.id.get();
-    let mut conn = cx.data().database.get()?;
     let count = delete(allowed_roles::table)
         .filter(allowed_roles::role_id.eq(TryInto::<i64>::try_into(role.id.get()).unwrap()))
         .filter(
             allowed_roles::operator_role.eq(TryInto::<i64>::try_into(operator.id.get()).unwrap()),
         )
-        .execute(&mut conn)?;
+        .execute(&mut cx.data().database.get()?)?;
     cx.say(if count > 0 {
         format!(
             "You have disallowed <@&{}> to assign/remove <@&{}> to other users.",
