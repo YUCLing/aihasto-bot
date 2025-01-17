@@ -90,7 +90,7 @@ pub async fn guild_audit_log_entry_create(cx: Context, entry: AuditLogEntry, gui
             let logs = ModerationLog::insert()
                 .values([CreateModerationLog::new(
                     guild_id,
-                    ModerationAction::Timeout,
+                    ModerationAction::Ban,
                     UserId::new(entry.target_id.unwrap().get()),
                     Some(entry.user_id),
                     entry.reason,
