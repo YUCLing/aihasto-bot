@@ -3,6 +3,9 @@ name = "aihasto-bot"
 version = "0.1.0-alpha"
 edition = "2021"
 
+[profile.release]
+debug = true
+
 [build-dependencies]
 git2 = { version = "0.20.0", default-features = false }
 
