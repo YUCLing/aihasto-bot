@@ -1,6 +1,6 @@
 use serenity::all::ChannelId;
 
-use crate::{models::guild_settings::GuildSettings, Context, Error};
+use crate::{commands::manage::set_server_id_impl, Context, Error};
 
 #[poise::command(slash_command, guild_only, subcommands("set_channel"))]
 pub async fn tempvoice(_cx: Context<'_>) -> Result<(), Error> {
@@ -15,28 +15,17 @@ pub async fn set_channel(
     #[channel_types("Voice")]
     channel: Option<ChannelId>,
 ) -> Result<(), Error> {
-    let guild = cx.guild_id().unwrap();
-    if let Some(channel) = channel {
-        GuildSettings::set(
-            &mut cx.data().database.get()?,
-            guild,
+    cx.say(
+        set_server_id_impl(
             "creator_voice_channel",
-            Some(channel.get().to_string()),
-        )?;
-        cx.say(format!(
-            "The creator voice channel has been set to <#{}>",
-            channel.get()
-        ))
-        .await?;
-    } else {
-        GuildSettings::set(
-            &mut cx.data().database.get()?,
-            guild,
-            "creator_voice_channel",
-            None::<String>,
-        )?;
-        cx.say("The temporary voice channel creation has been disabled.")
-            .await?;
-    }
+            "creator voice channel",
+            "#",
+            &cx.data().database,
+            cx.guild_id().unwrap(),
+            channel,
+        )
+        .await?,
+    )
+    .await?;
     Ok(())
 }

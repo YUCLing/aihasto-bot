@@ -1,0 +1,1 @@
+ALTER TYPE moderation_action ADD VALUE IF NOT EXISTS 'softban' BEFORE 'ban';

@@ -84,6 +84,7 @@ pub async fn inspect(
     let mut warns = 0;
     let mut floods = 0;
     let mut timeouts = 0;
+    let mut softbans = 0;
     let mut bans = 0;
     let logs: Vec<CreateEmbed> = {
         let mut conn = cx.data().database.get()?;
@@ -100,6 +101,7 @@ pub async fn inspect(
                 ModerationAction::Warning => warns = result.1,
                 ModerationAction::Flood => floods = result.1,
                 ModerationAction::Timeout => timeouts = result.1,
+                ModerationAction::Softban => softbans = result.1,
                 ModerationAction::Ban => bans = result.1,
             }
         }
@@ -132,6 +134,11 @@ pub async fn inspect(
                     (
                         ModerationAction::Timeout.embed_title(),
                         format!("{} time(s)", timeouts),
+                        true,
+                    ),
+                    (
+                        ModerationAction::Ban.embed_title(),
+                        format!("{} time(s)", softbans),
                         true,
                     ),
                     (
@@ -266,6 +273,47 @@ pub async fn flood_with_interaction(cx: Context<'_>, user: User) -> Result<(), E
                             .placeholder("e.g. 2h30m"),
                         ),
                     ]),
+                ),
+            )
+            .await?;
+    }
+    Ok(())
+}
+
+#[poise::command(
+    slash_command,
+    guild_only,
+    ephemeral,
+    default_member_permissions = "MUTE_MEMBERS"
+)]
+pub async fn softban(_cx: Context<'_>) -> Result<(), Error> {
+    todo!("implement softban")
+}
+
+#[poise::command(
+    context_menu_command = "Softban",
+    ephemeral,
+    default_member_permissions = "MUTE_MEMBERS"
+)]
+pub async fn softban_with_interaction(cx: Context<'_>, user: User) -> Result<(), Error> {
+    if let PoiseContext::Application(cx) = cx {
+        cx.interaction
+            .create_response(
+                &cx,
+                CreateInteractionResponse::Modal(
+                    CreateModal::new(
+                        format!("softban:{}", user.id),
+                        format!("Softban @{}", user.name),
+                    )
+                    .components(vec![CreateActionRow::InputText(
+                        CreateInputText::new(
+                            serenity::all::InputTextStyle::Short,
+                            "Reason",
+                            "reason",
+                        )
+                        .required(false)
+                        .placeholder("Leave blank for no reason"),
+                    )]),
                 ),
             )
             .await?;

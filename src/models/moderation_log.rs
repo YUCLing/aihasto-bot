@@ -23,6 +23,7 @@ pub enum ModerationAction {
     Warning,
     Flood,
     Timeout,
+    Softban,
     Ban,
 }
 
@@ -32,6 +33,7 @@ impl ModerationAction {
             Self::Warning => "🔔 Warning",
             Self::Flood => "🔒 Flood",
             Self::Timeout => "🔇 Timeout",
+            Self::Softban => "🛑 Softban",
             Self::Ban => "🚫 Ban",
         }
     }
@@ -41,6 +43,7 @@ impl ModerationAction {
             Self::Warning => Colour::ORANGE,
             Self::Flood => Colour::LIGHT_GREY,
             Self::Timeout => Colour::PURPLE,
+            Self::Softban => Colour::DARK_RED,
             Self::Ban => Colour::RED,
         }
     }
@@ -142,6 +145,7 @@ where
             ModerationAction::Warning => "warning",
             ModerationAction::Flood => "flood",
             ModerationAction::Timeout => "timeout",
+            ModerationAction::Softban => "softban",
             ModerationAction::Ban => "ban",
         }
         .to_sql(out)
@@ -158,6 +162,7 @@ where
             "warning" => Ok(ModerationAction::Warning),
             "flood" => Ok(ModerationAction::Flood),
             "timeout" => Ok(ModerationAction::Timeout),
+            "softban" => Ok(ModerationAction::Softban),
             "ban" => Ok(ModerationAction::Ban),
             x => Err(format!("Unknown variant {}", x).into()),
         }

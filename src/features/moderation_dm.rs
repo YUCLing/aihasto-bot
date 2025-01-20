@@ -24,6 +24,7 @@ pub fn generate_dm_message<T: Into<ChannelId>>(
                 ModerationAction::Warning => "warned",
                 ModerationAction::Flood => "marked as Flooder",
                 ModerationAction::Timeout => "timedout",
+                ModerationAction::Softban => "soft-banned",
                 ModerationAction::Ban => "banned",
             }
         ))
