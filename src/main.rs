@@ -113,7 +113,8 @@ async fn async_main() {
         | GatewayIntents::GUILDS
         | GatewayIntents::GUILD_VOICE_STATES
         | GatewayIntents::GUILD_MODERATION
-        | GatewayIntents::GUILD_MESSAGES;
+        | GatewayIntents::GUILD_MESSAGES
+        | GatewayIntents::DIRECT_MESSAGES;
 
     let queue_clone = queue.clone();
     let mut client = Client::builder(token, intents)
