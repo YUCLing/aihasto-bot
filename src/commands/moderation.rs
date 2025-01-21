@@ -74,6 +74,7 @@ pub async fn slowmode(
 #[poise::command(
     slash_command,
     context_menu_command = "Inspect",
+    guild_only,
     ephemeral,
     default_member_permissions = "MUTE_MEMBERS"
 )]
@@ -178,6 +179,7 @@ pub async fn warning(
 
 #[poise::command(
     context_menu_command = "Warning",
+    guild_only,
     ephemeral,
     default_member_permissions = "MUTE_MEMBERS"
 )]
@@ -208,7 +210,7 @@ pub async fn warning_with_interaction(cx: Context<'_>, user: User) -> Result<(),
 }
 
 /// Make a user Flooder. Use in the channel where the user violates the rules.
-#[poise::command(slash_command, ephemeral, default_member_permissions = "MUTE_MEMBERS")]
+#[poise::command(slash_command, guild_only, ephemeral, default_member_permissions = "MUTE_MEMBERS")]
 pub async fn flood(
     cx: Context<'_>,
     #[description = "User that gets the Flooder"] user: Member,
@@ -234,6 +236,7 @@ pub async fn flood(
 
 #[poise::command(
     context_menu_command = "Flood",
+    guild_only,
     ephemeral,
     default_member_permissions = "MUTE_MEMBERS"
 )]
