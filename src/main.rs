@@ -159,6 +159,8 @@ async fn async_main() {
     if let Err(err) = client.start().await {
         log::error!("Client error: {err:?}");
     }
+
+    process::exit(1);
 }
 
 fn main() {
