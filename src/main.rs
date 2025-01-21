@@ -69,6 +69,7 @@ async fn async_main() {
 
     let manager = ConnectionManager::<PgConnection>::new(db_url.clone());
     let pool = Pool::builder()
+        .max_size(24)
         .build(manager)
         .expect("Unable to create connection pool.");
 
