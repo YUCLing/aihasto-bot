@@ -16,6 +16,7 @@ const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 type ConnManager = ConnectionManager<PgConnection>;
 type ConnectionPool = Pool<ConnManager>;
+#[allow(dead_code)]
 type Connection = PooledConnection<ConnManager>;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;

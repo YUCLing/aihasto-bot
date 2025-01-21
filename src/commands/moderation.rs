@@ -210,7 +210,12 @@ pub async fn warning_with_interaction(cx: Context<'_>, user: User) -> Result<(),
 }
 
 /// Make a user Flooder. Use in the channel where the user violates the rules.
-#[poise::command(slash_command, guild_only, ephemeral, default_member_permissions = "MUTE_MEMBERS")]
+#[poise::command(
+    slash_command,
+    guild_only,
+    ephemeral,
+    default_member_permissions = "MUTE_MEMBERS"
+)]
 pub async fn flood(
     cx: Context<'_>,
     #[description = "User that gets the Flooder"] user: Member,
@@ -293,7 +298,8 @@ pub async fn reason(
     new_reason: String,
 ) -> Result<(), Error> {
     use crate::schema::moderation_log::*;
-    let mut conn = cx.data().database.get()?;
+    let pool = &cx.data().database;
+    let mut conn = pool.get()?;
     let Some(log) = update(table)
         .filter(id.eq(Uuid::from_str(&case_id).map_err(|_| "Case ID is invalid.")?))
         .set((reason.eq(new_reason), updated_at.eq(diesel::dsl::now)))
@@ -305,7 +311,7 @@ pub async fn reason(
         return Ok(());
     };
     if let Some(channel) =
-        GuildSettings::get(&mut conn, cx.guild_id().unwrap(), "moderation_log_channel")
+        GuildSettings::get(pool, cx.guild_id().unwrap(), "moderation_log_channel")
     {
         let result: Option<(i64, i64, i64)> = {
             use crate::schema::moderation_log_message::*;

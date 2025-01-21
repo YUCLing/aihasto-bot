@@ -18,7 +18,7 @@ pub async fn set_channel(
     let guild = cx.guild_id().unwrap();
     if let Some(channel) = channel {
         GuildSettings::set(
-            &mut cx.data().database.get()?,
+            &cx.data().database,
             guild,
             "creator_voice_channel",
             Some(channel.get().to_string()),
@@ -30,7 +30,7 @@ pub async fn set_channel(
         .await?;
     } else {
         GuildSettings::set(
-            &mut cx.data().database.get()?,
+            &cx.data().database,
             guild,
             "creator_voice_channel",
             None::<String>,

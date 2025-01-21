@@ -33,7 +33,7 @@ pub async fn set_flooder_role(
     let guild = cx.guild_id().unwrap();
     if let Some(role) = role {
         GuildSettings::set(
-            &mut cx.data().database.get()?,
+            &cx.data().database,
             guild,
             "flooder_role",
             Some(role.get().to_string()),
@@ -44,12 +44,7 @@ pub async fn set_flooder_role(
         ))
         .await?;
     } else {
-        GuildSettings::set(
-            &mut cx.data().database.get()?,
-            guild,
-            "flooder_role",
-            None::<String>,
-        )?;
+        GuildSettings::set(&cx.data().database, guild, "flooder_role", None::<String>)?;
         cx.say("The Flooder role has been disabled.").await?;
     }
     Ok(())

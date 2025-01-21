@@ -21,7 +21,7 @@ pub async fn set_moderation_log_channel(
     let guild = cx.guild_id().unwrap();
     if let Some(channel) = channel {
         GuildSettings::set(
-            &mut cx.data().database.get()?,
+            &cx.data().database,
             guild,
             "moderation_log_channel",
             Some(channel.get().to_string()),
@@ -33,7 +33,7 @@ pub async fn set_moderation_log_channel(
         .await?;
     } else {
         GuildSettings::set(
-            &mut cx.data().database.get()?,
+            &cx.data().database,
             guild,
             "moderation_log_channel",
             None::<String>,
@@ -55,7 +55,7 @@ pub async fn set_message_change_log_channel(
     let guild = cx.guild_id().unwrap();
     if let Some(channel) = channel {
         GuildSettings::set(
-            &mut cx.data().database.get()?,
+            &cx.data().database,
             guild,
             "message_change_log_channel",
             Some(channel.get().to_string()),
@@ -67,7 +67,7 @@ pub async fn set_message_change_log_channel(
         .await?;
     } else {
         GuildSettings::set(
-            &mut cx.data().database.get()?,
+            &cx.data().database,
             guild,
             "message_change_log_channel",
             None::<String>,

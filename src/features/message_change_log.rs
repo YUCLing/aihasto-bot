@@ -23,10 +23,7 @@ pub async fn handle_message_delete(
         return;
     };
     if let Some(log_channel) = GuildSettings::get(
-        &mut get_pool_from_serenity(&cx)
-            .await
-            .get()
-            .expect("Unable to get a database connection."),
+        &get_pool_from_serenity(&cx).await,
         guild_id,
         "message_change_log_channel",
     )
@@ -110,10 +107,7 @@ pub async fn handle_message_update(
         return;
     };
     if let Some(log_channel) = GuildSettings::get(
-        &mut get_pool_from_serenity(&cx)
-            .await
-            .get()
-            .expect("Unable to get a database connection."),
+        &get_pool_from_serenity(&cx).await,
         guild_id,
         "message_change_log_channel",
     )
