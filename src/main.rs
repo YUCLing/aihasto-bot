@@ -1,4 +1,4 @@
-use std::{env, panic, sync::RwLock};
+use std::{env, panic, process, sync::RwLock};
 
 use commands::build_commands;
 use data::{CacheHttpHolder, ConnectionPoolKey, Data, QueueKey};
@@ -11,6 +11,7 @@ use logging::{log_framework_error, setup_logger, setup_panic_logger_hook};
 use poise::{FrameworkError, PrefixFrameworkOptions};
 use r2d2::{Pool, PooledConnection};
 use serenity::{all::GatewayIntents, Client};
+use tokio::signal;
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
@@ -49,25 +50,6 @@ async fn async_main() {
     let token = env::var("DISCORD_TOKEN").expect("Discord Bot token is required.");
     let db_url = env::var("DATABASE_URL").expect("Database URL is required.");
 
-    let options = poise::FrameworkOptions::<_, Error> {
-        commands: build_commands(),
-        prefix_options: PrefixFrameworkOptions {
-            prefix: Some("!".to_string()),
-            ..Default::default()
-        },
-        on_error: |err: FrameworkError<'_, Data, Error>| {
-            Box::pin(async move {
-                log_framework_error(&err);
-            })
-        },
-        post_command: |cx: Context<'_>| {
-            Box::pin(async move {
-                log::info!(target: "aihasto_bot::command", "@{} ({}) executed \"{}\"", cx.author().name, cx.author().id, cx.command().qualified_name);
-            })
-        },
-        ..Default::default()
-    };
-
     let manager = ConnectionManager::<PgConnection>::new(db_url.clone());
     let pool = Pool::builder()
         .max_size(24)
@@ -90,6 +72,25 @@ async fn async_main() {
     queue.connect().await.unwrap();
 
     log::info!("Queue created.");
+
+    let options = poise::FrameworkOptions::<_, Error> {
+        commands: build_commands(),
+        prefix_options: PrefixFrameworkOptions {
+            prefix: Some("!".to_string()),
+            ..Default::default()
+        },
+        on_error: |err: FrameworkError<'_, Data, Error>| {
+            Box::pin(async move {
+                log_framework_error(&err);
+            })
+        },
+        post_command: |cx: Context<'_>| {
+            Box::pin(async move {
+                log::info!(target: "aihasto_bot::command", "@{} ({}) executed \"{}\"", cx.author().name, cx.author().id, cx.command().qualified_name);
+            })
+        },
+        ..Default::default()
+    };
 
     let pool_clone = pool.clone();
     let queue_clone = queue.clone();
@@ -139,6 +140,20 @@ async fn async_main() {
     log::info!("Queue workers started.");
 
     log::info!("Starting bot...");
+
+    let shard_manager = client.shard_manager.clone();
+    tokio::spawn(async move {
+        let shutdown = async move {
+            log::info!("Shutting down...");
+            shard_manager.shutdown_all().await;
+            process::exit(0);
+        };
+        let mut sigterm = signal::unix::signal(signal::unix::SignalKind::terminate()).unwrap();
+        tokio::select! {
+            _ = signal::ctrl_c() => shutdown.await,
+            _ = sigterm.recv() => shutdown.await
+        };
+    });
 
     if let Err(err) = client.start().await {
         log::error!("Client error: {err:?}");
