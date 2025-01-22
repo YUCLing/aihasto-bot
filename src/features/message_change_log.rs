@@ -135,10 +135,12 @@ pub async fn handle_message_update(
             .author(author.into())
             .description(if old_message.content != msg.content {
                 format!(
-                    "**_Old Message_**\n\
+                    "https://discord.com/channels/{}/{}/{}\n\
+                    **_Old Message_**\n\
                     {}\n\n\
                     **_New Message_**\n\
                     {}",
+                    guild_id, msg.channel_id, msg.id,
                     old_message.content, msg.content
                 )
             } else {
