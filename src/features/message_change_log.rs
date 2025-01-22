@@ -123,7 +123,10 @@ pub async fn handle_message_update(
         let mut embed = CreateEmbed::new()
             .color(Colour::ORANGE)
             .title("Message Edited")
-            .url(format!("https://discord.com/channels/{}/{}/{}", guild_id, msg.channel_id, msg.id))
+            .url(format!(
+                "https://discord.com/channels/{}/{}/{}",
+                guild_id, msg.channel_id, msg.id
+            ))
             .fields([
                 ("User", format!("<@{}>", author.id), true),
                 ("Channel", format!("<#{}>", msg.channel_id), true),

@@ -69,7 +69,6 @@ impl IdCache {
     }
 }
 
-
 pub struct GuildSettingsCache {
     id_caches: Arc<DashMap<u64, Arc<IdCache>>>,
     capacity: usize,
@@ -123,8 +122,14 @@ mod tests {
     #[test]
     fn test_insert_and_get() {
         let cache = GuildSettingsCache::new(2);
-        let key1 = CacheKey { id: 1, name: "setting1".to_string() };
-        let key2 = CacheKey { id: 1, name: "setting2".to_string() };
+        let key1 = CacheKey {
+            id: 1,
+            name: "setting1".to_string(),
+        };
+        let key2 = CacheKey {
+            id: 1,
+            name: "setting2".to_string(),
+        };
 
         cache.insert(key1.clone(), "value1".to_string());
         cache.insert(key2.clone(), "value2".to_string());
@@ -136,9 +141,18 @@ mod tests {
     #[test]
     fn test_lfu_eviction_same_id() {
         let cache = GuildSettingsCache::new(2);
-        let key1 = CacheKey { id: 1, name: "setting1".to_string() };
-        let key2 = CacheKey { id: 1, name: "setting2".to_string() };
-        let key3 = CacheKey { id: 1, name: "setting3".to_string() };
+        let key1 = CacheKey {
+            id: 1,
+            name: "setting1".to_string(),
+        };
+        let key2 = CacheKey {
+            id: 1,
+            name: "setting2".to_string(),
+        };
+        let key3 = CacheKey {
+            id: 1,
+            name: "setting3".to_string(),
+        };
 
         cache.insert(key1.clone(), "value1".to_string()); // freq 0
         cache.insert(key2.clone(), "value2".to_string()); // freq 0
@@ -153,10 +167,22 @@ mod tests {
     #[test]
     fn test_explicit_lfu_eviction_order() {
         let cache = GuildSettingsCache::new(3); // Capacity 3 for easier control
-        let key1 = CacheKey { id: 1, name: "setting1".to_string() };
-        let key2 = CacheKey { id: 1, name: "setting2".to_string() };
-        let key3 = CacheKey { id: 1, name: "setting3".to_string() };
-        let key4 = CacheKey { id: 1, name: "setting4".to_string() };
+        let key1 = CacheKey {
+            id: 1,
+            name: "setting1".to_string(),
+        };
+        let key2 = CacheKey {
+            id: 1,
+            name: "setting2".to_string(),
+        };
+        let key3 = CacheKey {
+            id: 1,
+            name: "setting3".to_string(),
+        };
+        let key4 = CacheKey {
+            id: 1,
+            name: "setting4".to_string(),
+        };
 
         cache.insert(key1.clone(), "value1".to_string()); // freq 0
         cache.insert(key2.clone(), "value2".to_string()); // freq 0
@@ -179,8 +205,14 @@ mod tests {
     #[test]
     fn test_invalidate() {
         let cache = GuildSettingsCache::new(2);
-        let key1 = CacheKey { id: 1, name: "setting1".to_string() };
-        let key2 = CacheKey { id: 1, name: "setting2".to_string() };
+        let key1 = CacheKey {
+            id: 1,
+            name: "setting1".to_string(),
+        };
+        let key2 = CacheKey {
+            id: 1,
+            name: "setting2".to_string(),
+        };
 
         cache.insert(key1.clone(), "value1".to_string());
         cache.insert(key2.clone(), "value2".to_string());
@@ -194,7 +226,10 @@ mod tests {
     #[test]
     fn test_invalidate_and_reinsert() {
         let cache = GuildSettingsCache::new(2);
-        let key1 = CacheKey { id: 1, name: "setting1".to_string() };
+        let key1 = CacheKey {
+            id: 1,
+            name: "setting1".to_string(),
+        };
 
         cache.insert(key1.clone(), "value1".to_string());
         cache.invalidate(&key1);
@@ -214,7 +249,10 @@ mod tests {
             handles.push(thread::spawn(move || {
                 let id = (i % 2) as u64 + 1; // Two IDs: 1 and 2
                 for j in 0..10 {
-                    let key = CacheKey { id, name: format!("setting{}", j) };
+                    let key = CacheKey {
+                        id,
+                        name: format!("setting{}", j),
+                    };
                     cache_clone.insert(key.clone(), format!("value_{}_{}", id, j));
                     cache_clone.get(&key); // Simulate access
                     thread::sleep(Duration::from_millis(5)); // Introduce some delay
@@ -229,10 +267,16 @@ mod tests {
         // After threads finish, check cache state (basic verification)
         for id in 1..=2 {
             for j in 0..10 {
-                let key = CacheKey { id, name: format!("setting{}", j) };
+                let key = CacheKey {
+                    id,
+                    name: format!("setting{}", j),
+                };
                 if cache.get(&key).is_some() {
                     // Basic check - some entries should likely remain, but eviction might happen
-                    println!("Entry for id={} name={} still in cache (or was re-inserted)", id, j);
+                    println!(
+                        "Entry for id={} name={} still in cache (or was re-inserted)",
+                        id, j
+                    );
                 }
             }
         }
