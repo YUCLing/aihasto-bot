@@ -69,7 +69,7 @@ pub async fn handle_message_delete_bulk(
     guild_id: Option<GuildId>,
 ) {
     for msg in multiple_deleted_messages_ids {
-        handle_message_delete(cx.clone(), channel_id, msg, guild_id).await;
+        tokio::spawn(handle_message_delete(cx.clone(), channel_id, msg, guild_id)).await.unwrap();
     }
 }
 
