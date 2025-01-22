@@ -1,6 +1,4 @@
-use std::sync::Arc;
-
-use dashmap::DashMap;
+use cache::{CacheKey, GuildSettingsCache};
 use diesel::{
     insert_into,
     prelude::{Insertable, Queryable},
@@ -12,69 +10,10 @@ use serenity::all::GuildId;
 
 use crate::{schema::guild_settings, ConnectionPool};
 
+mod cache;
+
 lazy_static! {
     static ref GUILD_SETTINGS_CACHE: GuildSettingsCache = GuildSettingsCache::new(50);
-}
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct CacheKey {
-    pub id: u64,
-    pub name: String,
-}
-
-struct CacheEntry {
-    value: String,
-    frequency: usize,
-}
-
-pub struct GuildSettingsCache {
-    data: Arc<DashMap<CacheKey, CacheEntry>>,
-    capacity: usize,
-}
-
-impl GuildSettingsCache {
-    pub fn new(capacity: usize) -> Self {
-        GuildSettingsCache {
-            data: Arc::new(DashMap::new()),
-            capacity,
-        }
-    }
-
-    pub fn get(&self, key: &CacheKey) -> Option<String> {
-        if let Some(mut entry) = self.data.get_mut(key) {
-            entry.frequency += 1;
-            Some(entry.value().value.clone())
-        } else {
-            None
-        }
-    }
-
-    pub fn insert(&self, key: CacheKey, value: String) {
-        if self.data.len() >= self.capacity && !self.data.contains_key(&key) {
-            let mut min_freq = usize::MAX;
-            let mut lfu_key = None;
-            for entry in self.data.iter() {
-                if entry.value().frequency < min_freq {
-                    min_freq = entry.value().frequency;
-                    lfu_key = Some(entry.key().clone());
-                }
-            }
-            if let Some(k) = lfu_key {
-                self.data.remove(&k);
-            }
-        }
-        self.data.insert(
-            key,
-            CacheEntry {
-                value,
-                frequency: 0,
-            },
-        );
-    }
-
-    pub fn invalidate(&self, key: &CacheKey) {
-        self.data.remove(key);
-    }
 }
 
 #[derive(Insertable, Selectable, Queryable)]
