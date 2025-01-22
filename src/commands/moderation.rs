@@ -299,12 +299,11 @@ pub async fn reason(
 ) -> Result<(), Error> {
     use crate::schema::moderation_log::*;
     let pool = &cx.data().database;
-    let mut conn = pool.get()?;
     let Some(log) = update(table)
         .filter(id.eq(Uuid::from_str(&case_id).map_err(|_| "Case ID is invalid.")?))
         .set((reason.eq(new_reason), updated_at.eq(diesel::dsl::now)))
         .returning(ModerationLog::as_returning())
-        .get_result(&mut conn)
+        .get_result(&mut pool.get()?)
         .optional()?
     else {
         cx.say("No case with provided ID found.").await?;
@@ -318,10 +317,9 @@ pub async fn reason(
             table
                 .filter(log_id.eq(log.id))
                 .select((id, guild, channel))
-                .get_result(&mut conn)
+                .get_result(&mut pool.get()?)
                 .optional()?
         };
-        std::mem::drop(conn);
         let channel = ChannelId::new(channel.parse().unwrap());
         channel
             .send_message(
@@ -341,8 +339,6 @@ pub async fn reason(
                 },
             )
             .await?;
-    } else {
-        std::mem::drop(conn);
     }
     cx.say("Case has been updated.").await?;
     Ok(())

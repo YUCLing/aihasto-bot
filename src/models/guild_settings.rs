@@ -70,14 +70,11 @@ impl GuildSettings {
             return Some(value);
         }
         let id: i64 = raw_id.try_into().unwrap();
-        let Ok(mut conn) = pool.get() else {
-            return None;
-        };
         let Ok(result): Result<GuildSettings, _> = guild_settings::table
             .filter(guild_settings::guild.eq(id))
             .filter(guild_settings::key.eq(key))
             .select(GuildSettings::as_select())
-            .get_result(&mut conn)
+            .get_result(&mut pool.get().ok()?)
         else {
             return None;
         };
