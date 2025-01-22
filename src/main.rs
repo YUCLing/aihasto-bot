@@ -13,6 +13,10 @@ use r2d2::{Pool, PooledConnection};
 use serenity::{all::GatewayIntents, Client};
 use tokio::signal;
 
+const DATABASE_POOL_SIZE: u32 = 24;
+const QUEUE_POOL_SIZE: u32 = 4;
+const QUEUE_WORKERS: u32 = 4;
+
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 type ConnManager = ConnectionManager<PgConnection>;
@@ -52,7 +56,12 @@ async fn async_main() {
 
     let manager = ConnectionManager::<PgConnection>::new(db_url.clone());
     let pool = Pool::builder()
-        .max_size(24)
+        .max_size(
+            env::var("DATABASE_POOL_SIZE")
+                .ok()
+                .and_then(|x| x.parse().ok())
+                .unwrap_or(DATABASE_POOL_SIZE),
+        )
         .build(manager)
         .expect("Unable to create connection pool.");
 
@@ -66,7 +75,12 @@ async fn async_main() {
 
     let mut queue = AsyncQueue::builder()
         .uri(db_url)
-        .max_pool_size(4u32)
+        .max_pool_size(
+            env::var("QUEUE_POOL_SIZE")
+                .ok()
+                .and_then(|x| x.parse().ok())
+                .unwrap_or(QUEUE_POOL_SIZE),
+        )
         .build();
 
     queue.connect().await.unwrap();
@@ -133,7 +147,12 @@ async fn async_main() {
     client.cache.set_max_messages(256);
 
     let mut pool: AsyncWorkerPool<AsyncQueue> = AsyncWorkerPool::builder()
-        .number_of_workers(4u32)
+        .number_of_workers(
+            env::var("QUEUE_WORKERS")
+                .ok()
+                .and_then(|x| x.parse().ok())
+                .unwrap_or(QUEUE_WORKERS),
+        )
         .queue(queue)
         .build();
     pool.start().await;
