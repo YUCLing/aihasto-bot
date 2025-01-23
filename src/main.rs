@@ -42,6 +42,7 @@ lazy_static! {
 }
 
 fn acquire_cache_http() -> CacheHttpHolder {
+    log::trace!("Acquiring static cache http.");
     CACHE_HTTP
         .read()
         .unwrap()
@@ -53,6 +54,7 @@ fn acquire_cache_http() -> CacheHttpHolder {
 async fn async_main() {
     let token = env::var("DISCORD_TOKEN").expect("Discord Bot token is required.");
     let db_url = env::var("DATABASE_URL").expect("Database URL is required.");
+    log::trace!("Fetched Discord token and database URL.");
 
     let manager = ConnectionManager::<PgConnection>::new(db_url.clone());
     let pool = Pool::builder()
@@ -64,11 +66,13 @@ async fn async_main() {
         )
         .build(manager)
         .expect("Unable to create connection pool.");
+    log::trace!("Connection pool instance created.");
 
     {
         let mut conn = pool.get().expect("Unable to get a database connection.");
         conn.run_pending_migrations(MIGRATIONS)
             .expect("Unable to migrate the database.");
+        log::trace!("Database migration completed.");
     }
 
     log::info!("Database pool created.");
@@ -82,6 +86,7 @@ async fn async_main() {
                 .unwrap_or(QUEUE_POOL_SIZE),
         )
         .build();
+    log::trace!("Queue instance created.");
 
     queue.connect().await.unwrap();
 
@@ -105,6 +110,7 @@ async fn async_main() {
         },
         ..Default::default()
     };
+    log::trace!("poise options created.");
 
     let pool_clone = pool.clone();
     let queue_clone = queue.clone();
@@ -122,6 +128,7 @@ async fn async_main() {
         })
         .options(options)
         .build();
+    log::trace!("poise instance created.");
 
     let intents = GatewayIntents::privileged()
         | GatewayIntents::GUILDS
@@ -138,13 +145,16 @@ async fn async_main() {
         .type_map_insert::<QueueKey>(queue_clone)
         .await
         .expect("Unable to create the client");
+    log::trace!("serenity client instance created.");
 
     {
         let mut cache_http = CACHE_HTTP.write().unwrap();
         *cache_http = Some(CacheHttpHolder(client.cache.clone(), client.http.clone()));
+        log::trace!("Static cache http set.");
     }
 
     client.cache.set_max_messages(256);
+    log::trace!("Max cache messages set.");
 
     let mut pool: AsyncWorkerPool<AsyncQueue> = AsyncWorkerPool::builder()
         .number_of_workers(
@@ -213,6 +223,7 @@ fn main() {
                 ..Default::default()
             },
         ));
+        log::trace!("Sentry ready.");
     }
 
     tokio::runtime::Builder::new_multi_thread()
