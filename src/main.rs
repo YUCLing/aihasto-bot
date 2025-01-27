@@ -1,4 +1,4 @@
-use std::{env, panic, process, sync::RwLock};
+use std::{env, panic, process, sync::RwLock, time::Duration};
 
 use commands::build_commands;
 use data::{CacheHttpHolder, ConnectionPoolKey, Data, QueueKey};
@@ -10,7 +10,7 @@ use lazy_static::lazy_static;
 use logging::{log_framework_error, setup_logger, setup_panic_logger_hook};
 use poise::{FrameworkError, PrefixFrameworkOptions};
 use r2d2::{Pool, PooledConnection};
-use serenity::{all::GatewayIntents, Client};
+use serenity::{all::{GatewayIntents, ShardId}, Client};
 use tokio::signal;
 
 const DATABASE_POOL_SIZE: u32 = 24;
@@ -130,12 +130,26 @@ async fn async_main() {
         | GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES;
 
-    let queue_clone = queue.clone();
+    let mut worker_pool: AsyncWorkerPool<AsyncQueue> = AsyncWorkerPool::builder()
+        .number_of_workers(
+            env::var("QUEUE_WORKERS")
+                .ok()
+                .and_then(|x| x.parse().ok())
+                .unwrap_or(QUEUE_WORKERS),
+        )
+        .queue(queue.clone())
+        .build();
+    worker_pool.start().await;
+
+    log::info!("Queue workers started.");
+
+    log::info!("Starting bot...");
+
     let mut client = Client::builder(token, intents)
         .event_handler(Handler)
         .framework(framework)
         .type_map_insert::<ConnectionPoolKey>(pool)
-        .type_map_insert::<QueueKey>(queue_clone)
+        .type_map_insert::<QueueKey>(queue)
         .await
         .expect("Unable to create the client");
 
@@ -146,26 +160,19 @@ async fn async_main() {
 
     client.cache.set_max_messages(256);
 
-    let mut pool: AsyncWorkerPool<AsyncQueue> = AsyncWorkerPool::builder()
-        .number_of_workers(
-            env::var("QUEUE_WORKERS")
-                .ok()
-                .and_then(|x| x.parse().ok())
-                .unwrap_or(QUEUE_WORKERS),
-        )
-        .queue(queue)
-        .build();
-    pool.start().await;
-
-    log::info!("Queue workers started.");
-
-    log::info!("Starting bot...");
-
     let shard_manager = client.shard_manager.clone();
     tokio::spawn(async move {
         let shutdown = async move {
             log::info!("Shutting down...");
-            shard_manager.shutdown_all().await;
+            tokio::select! {
+                _ = async move {
+                    shard_manager.shutdown_all().await;
+                } => {},
+                _ = tokio::time::sleep(Duration::from_secs(5)) => {
+                    log::error!("Unable to gracefully shutdown in time.");
+                    process::exit(2);
+                }
+            }
             process::exit(0);
         };
         let mut sigterm = signal::unix::signal(signal::unix::SignalKind::terminate()).unwrap();
@@ -173,6 +180,18 @@ async fn async_main() {
             _ = signal::ctrl_c() => shutdown.await,
             _ = sigterm.recv() => shutdown.await
         };
+    });
+
+    let shard_manager = client.shard_manager.clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(12 * 60 * 60)).await;
+            let shards: Vec<ShardId> = shard_manager.runners.lock().await.keys().cloned().collect();
+            for shard in shards {
+                log::debug!("Restarting shard {}", shard);
+                shard_manager.restart(shard).await;
+            }
+        }
     });
 
     if let Err(err) = client.start().await {
