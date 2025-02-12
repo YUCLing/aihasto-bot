@@ -3,6 +3,7 @@ use poise::Command;
 use crate::{data::Data, Error};
 
 mod beep;
+mod case;
 mod manage;
 mod moderation;
 mod role;
@@ -11,6 +12,7 @@ mod temp_voice;
 pub fn build_commands() -> Vec<Command<Data, Error>> {
     vec![
         beep::beep(),
+        case::case(),
         manage::sman(),
         moderation::slowmode(),
         moderation::inspect(),
@@ -20,7 +22,6 @@ pub fn build_commands() -> Vec<Command<Data, Error>> {
         moderation::flood(),
         moderation::flood_with_interaction(),
         moderation::unflood(),
-        moderation::reason(),
         role::role(),
         role::temp_role(),
         temp_voice::temp_voice(),

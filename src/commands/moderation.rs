@@ -1,18 +1,12 @@
-use std::str::FromStr;
-
-use diesel::{
-    update, ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl, SelectableHelper,
-};
 use poise::Context as PoiseContext;
 use serenity::all::{
-    ChannelId, CreateActionRow, CreateInputText, CreateInteractionResponse, CreateMessage,
-    CreateModal, EditChannel, EditMessage, Member, MessageId, RoleId, User,
+    CreateActionRow, CreateInputText, CreateInteractionResponse, CreateModal, EditChannel, Member,
+    RoleId, User,
 };
-use uuid::Uuid;
 
 use crate::{
     features::moderation::{flood_impl, inspect_impl, warning_impl},
-    models::{guild_settings::GuildSettings, moderation_log::ModerationLog},
+    models::guild_settings::GuildSettings,
     util::parse_duration_to_seconds,
     Context, Error,
 };
@@ -289,68 +283,5 @@ pub async fn softban_with_interaction(cx: Context<'_>, user: User) -> Result<(),
             )
             .await?;
     }
-    Ok(())
-}
-
-/// Update the reason of a case.
-#[poise::command(
-    slash_command,
-    guild_only,
-    ephemeral,
-    default_member_permissions = "MUTE_MEMBERS"
-)]
-pub async fn reason(
-    cx: Context<'_>,
-    #[description = "ID of the case to be updated"]
-    #[rename = "id"]
-    case_id: String,
-    #[description = "New reason"]
-    #[rename = "reason"]
-    new_reason: String,
-) -> Result<(), Error> {
-    use crate::schema::moderation_log::*;
-    let pool = &cx.data().database;
-    let Some(log) = update(table)
-        .filter(id.eq(Uuid::from_str(&case_id).map_err(|_| "Case ID is invalid.")?))
-        .set((reason.eq(new_reason), updated_at.eq(diesel::dsl::now)))
-        .returning(ModerationLog::as_returning())
-        .get_result(&mut pool.get()?)
-        .optional()?
-    else {
-        cx.say("No case with provided ID found.").await?;
-        return Ok(());
-    };
-    if let Some(channel) =
-        GuildSettings::get(pool, cx.guild_id().unwrap(), "moderation_log_channel")
-    {
-        let result: Option<(i64, i64, i64)> = {
-            use crate::schema::moderation_log_message::*;
-            table
-                .filter(log_id.eq(log.id))
-                .select((id, guild, channel))
-                .get_result(&mut pool.get()?)
-                .optional()?
-        };
-        let channel = ChannelId::new(channel.parse().unwrap());
-        channel
-            .send_message(
-                &cx,
-                if let Some((message_id, guild_id, channel_id)) = result {
-                    channel.edit_message(&cx, MessageId::new(message_id.try_into().unwrap()), EditMessage::new()
-                        .embed(log.into()))
-                        .await?;
-                    CreateMessage::new().content(format!(
-                        "A case has been updated.\nLink to the case: https://discord.com/channels/{}/{}/{}",
-                        guild_id, channel_id, message_id
-                    ))
-                } else {
-                    CreateMessage::new()
-                        .content("A case has been updated.")
-                        .embed(log.into())
-                },
-            )
-            .await?;
-    }
-    cx.say("Case has been updated.").await?;
     Ok(())
 }
