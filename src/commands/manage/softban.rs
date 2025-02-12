@@ -13,8 +13,7 @@ pub async fn softban(_cx: Context<'_>) -> Result<(), Error> {
 #[poise::command(slash_command, ephemeral)]
 pub async fn setup_permissions(cx: Context<'_>) -> Result<(), Error> {
     let guild_id = cx.guild_id().unwrap();
-    let Some(role) = GuildSettings::get(&cx.data().database, guild_id, "softban_role")
-    else {
+    let Some(role) = GuildSettings::get(&cx.data().database, guild_id, "softban_role") else {
         return Ok(());
     };
     let role = RoleId::new(role.parse().unwrap());
@@ -24,13 +23,22 @@ pub async fn setup_permissions(cx: Context<'_>) -> Result<(), Error> {
         deny: Permissions::all(),
         kind: PermissionOverwriteType::Role(role),
     };
+    let mut handles = Vec::with_capacity(channels.len());
     for (_id, channel) in channels {
         if channel.parent_id.is_none() || !channel.permission_overwrites.is_empty() {
             // is a channel without parent, is a category or is not sync with the parent
-            channel
-                .create_permission(&cx, permission_override.clone())
-                .await?;
+            let cx = cx.serenity_context().clone();
+            let channel = channel.clone();
+            let permission_override = permission_override.clone();
+            handles.push(tokio::spawn(async move {
+                channel
+                    .create_permission(cx.clone(), permission_override)
+                    .await
+            }));
         }
+    }
+    for handle in handles {
+        handle.await??;
     }
     cx.say(format!("Denied <@&{}> from accessing all channels.", role))
         .await?;
