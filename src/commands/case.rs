@@ -1,13 +1,13 @@
 use std::str::FromStr;
 
 use diesel::{
-    delete as diesel_delete, update, ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl,
-    SelectableHelper,
+    update, ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl, SelectableHelper,
 };
 use serenity::all::{ChannelId, CreateMessage, EditMessage, MessageId};
 use uuid::Uuid;
 
 use crate::{
+    features::case::delete_impl,
     models::{guild_settings::GuildSettings, moderation_log::ModerationLog},
     Context, Error,
 };
@@ -88,35 +88,7 @@ pub async fn delete(
     #[rename = "id"]
     case_id: String,
 ) -> Result<(), Error> {
-    use crate::schema::moderation_log::*;
     let pool = &cx.data().database;
-    let Some(log) = diesel_delete(table)
-        .filter(id.eq(Uuid::from_str(&case_id).map_err(|_| "Case ID is invalid.")?))
-        .returning(ModerationLog::as_returning())
-        .get_result(&mut pool.get()?)
-        .optional()?
-    else {
-        cx.say("No case with provided ID found.").await?;
-        return Ok(());
-    };
-    if let Some(channel) =
-        GuildSettings::get(pool, cx.guild_id().unwrap(), "moderation_log_channel")
-    {
-        let result: Option<i64> = {
-            use crate::schema::moderation_log_message::*;
-            diesel_delete(table)
-                .filter(log_id.eq(log.id))
-                .returning(id)
-                .get_result(&mut pool.get()?)
-                .optional()?
-        };
-        let channel = ChannelId::new(channel.parse().unwrap());
-        if let Some(message_id) = result {
-            channel
-                .delete_message(&cx, MessageId::new(message_id.try_into().unwrap()))
-                .await?;
-        }
-    }
-    cx.say("Case has been deleted.").await?;
+    delete_impl(pool, case_id).await?;
     Ok(())
 }

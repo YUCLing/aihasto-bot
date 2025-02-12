@@ -5,7 +5,7 @@ use serenity::all::{
 };
 
 use crate::{
-    features::moderation::{flood_impl, inspect_impl, warning_impl},
+    features::moderation::{flood_impl, inspect_impl, softban_impl, warning_impl},
     models::guild_settings::GuildSettings,
     util::parse_duration_to_seconds,
     Context, Error,
@@ -102,15 +102,17 @@ pub async fn warning(
     cx: Context<'_>,
     #[description = "The user that receives the warning"] user: Member,
     #[description = "Reason of warning"] reason: Option<String>,
+    #[description = "Valid duration of warning"] duration: Option<String>,
 ) -> Result<(), Error> {
     cx.say(
         warning_impl(
             &cx,
-            &cx.data().database,
+            (&cx.data().database, &cx.data().queue),
             cx.channel_id(),
             user,
             cx.author(),
             reason,
+            duration,
         )
         .await?,
     )
@@ -134,15 +136,26 @@ pub async fn warning_with_interaction(cx: Context<'_>, user: User) -> Result<(),
                         format!("warning:{}", user.id),
                         format!("Warning @{}", user.name),
                     )
-                    .components(vec![CreateActionRow::InputText(
-                        CreateInputText::new(
-                            serenity::all::InputTextStyle::Short,
-                            "Reason",
-                            "reason",
-                        )
-                        .required(false)
-                        .placeholder("Leave blank for no reason"),
-                    )]),
+                    .components(vec![
+                        CreateActionRow::InputText(
+                            CreateInputText::new(
+                                serenity::all::InputTextStyle::Short,
+                                "Reason",
+                                "reason",
+                            )
+                            .required(false)
+                            .placeholder("Leave blank for no reason"),
+                        ),
+                        CreateActionRow::InputText(
+                            CreateInputText::new(
+                                serenity::all::InputTextStyle::Short,
+                                "Duration",
+                                "duration",
+                            )
+                            .required(false)
+                            .placeholder("Leave blank for forever"),
+                        ),
+                    ]),
                 ),
             )
             .await?;
@@ -245,14 +258,51 @@ pub async fn unflood(
     Ok(())
 }
 
+/// Softban a user.
 #[poise::command(
     slash_command,
     guild_only,
     ephemeral,
     default_member_permissions = "MUTE_MEMBERS"
 )]
-pub async fn softban(_cx: Context<'_>) -> Result<(), Error> {
-    todo!("implement softban")
+pub async fn softban(
+    cx: Context<'_>,
+    #[description = "User that will be softbanned."] user: Member,
+    #[description = "Reason"] reason: Option<String>,
+) -> Result<(), Error> {
+    cx.say(
+        softban_impl(
+            &cx,
+            &cx.data().database,
+            cx.channel_id(),
+            user,
+            cx.author(),
+            reason,
+        )
+        .await?,
+    )
+    .await?;
+    Ok(())
+}
+
+/// Unsoftban a user.
+#[poise::command(
+    slash_command,
+    guild_only,
+    ephemeral,
+    default_member_permissions = "MUTE_MEMBERS"
+)]
+pub async fn unsoftban(cx: Context<'_>, #[description = "User that will be unsoftbanned."] user: Member) -> Result<(), Error> {
+    let Some(softban_role) =
+        GuildSettings::get(&cx.data().database, cx.guild_id().unwrap(), "softban_role")
+            .map(|x| RoleId::new(x.parse().unwrap()))
+    else {
+        cx.say("Softban is disabled.").await?;
+        return Ok(());
+    };
+    user.remove_role(cx, softban_role).await?;
+    cx.say("Unsoftbanned the user.").await?;
+    Ok(())
 }
 
 #[poise::command(

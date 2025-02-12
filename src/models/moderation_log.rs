@@ -63,6 +63,7 @@ impl TryFrom<String> for ModerationAction {
             "warning" => Ok(ModerationAction::Warning),
             "flood" => Ok(ModerationAction::Flood),
             "timeout" => Ok(ModerationAction::Timeout),
+            "softban" => Ok(ModerationAction::Softban),
             "ban" => Ok(ModerationAction::Ban),
             x => Err(format!("Unknown variant {}", x)),
         }

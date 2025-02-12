@@ -22,6 +22,8 @@ pub fn build_commands() -> Vec<Command<Data, Error>> {
         moderation::flood(),
         moderation::flood_with_interaction(),
         moderation::unflood(),
+        moderation::softban(),
+        moderation::unsoftban(),
         role::role(),
         role::temp_role(),
         temp_voice::temp_voice(),

@@ -39,6 +39,7 @@ mod util;
 
 lazy_static! {
     static ref CACHE_HTTP: RwLock<Option<CacheHttpHolder>> = RwLock::new(None);
+    static ref DB_POOL: RwLock<Option<ConnectionPool>> = RwLock::new(None);
 }
 
 fn acquire_cache_http() -> CacheHttpHolder {
@@ -47,6 +48,15 @@ fn acquire_cache_http() -> CacheHttpHolder {
         .unwrap()
         .as_ref()
         .expect("Why the hell we can't get the holder?")
+        .clone()
+}
+
+fn acquire_pool() -> ConnectionPool {
+    DB_POOL
+        .read()
+        .unwrap()
+        .as_ref()
+        .expect("Why the hell we can't get the pool?")
         .clone()
 }
 
@@ -122,6 +132,11 @@ async fn async_main() {
         })
         .options(options)
         .build();
+
+    {
+        let mut db_pool = DB_POOL.write().unwrap();
+        *db_pool = Some(pool.clone());
+    }
 
     let intents = GatewayIntents::privileged()
         | GatewayIntents::GUILDS
