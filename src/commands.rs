@@ -19,6 +19,7 @@ pub fn build_commands() -> Vec<Command<Data, Error>> {
         moderation::warning_with_interaction(),
         moderation::flood(),
         moderation::flood_with_interaction(),
+        moderation::unflood(),
         moderation::reason(),
         role::role(),
         role::temp_role(),

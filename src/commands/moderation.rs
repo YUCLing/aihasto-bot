@@ -6,7 +6,7 @@ use diesel::{
 use poise::Context as PoiseContext;
 use serenity::all::{
     ChannelId, CreateActionRow, CreateInputText, CreateInteractionResponse, CreateMessage,
-    CreateModal, EditChannel, EditMessage, Member, MessageId, User,
+    CreateModal, EditChannel, EditMessage, Member, MessageId, RoleId, User,
 };
 use uuid::Uuid;
 
@@ -225,6 +225,29 @@ pub async fn flood_with_interaction(cx: Context<'_>, user: User) -> Result<(), E
             )
             .await?;
     }
+    Ok(())
+}
+
+/// Make a user no longer a Flooder
+#[poise::command(
+    slash_command,
+    guild_only,
+    ephemeral,
+    default_member_permissions = "MUTE_MEMBERS"
+)]
+pub async fn unflood(
+    cx: Context<'_>,
+    #[description = "The user that will be unflooded."] user: Member,
+) -> Result<(), Error> {
+    let Some(flooder_role) =
+        GuildSettings::get(&cx.data().database, cx.guild_id().unwrap(), "flooder_role")
+            .map(|x| RoleId::new(x.parse().unwrap()))
+    else {
+        cx.say("Flooder is disabled.").await?;
+        return Ok(());
+    };
+    user.remove_role(cx, flooder_role).await?;
+    cx.say("Removed the Flooder role from the user.").await?;
     Ok(())
 }
 
