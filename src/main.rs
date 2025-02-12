@@ -10,7 +10,7 @@ use lazy_static::lazy_static;
 use logging::{log_framework_error, setup_logger, setup_panic_logger_hook};
 use poise::{FrameworkError, PrefixFrameworkOptions};
 use r2d2::{Pool, PooledConnection};
-use serenity::{all::{GatewayIntents, ShardId}, Client};
+use serenity::{all::GatewayIntents, Client};
 use tokio::signal;
 
 const DATABASE_POOL_SIZE: u32 = 24;
@@ -180,18 +180,6 @@ async fn async_main() {
             _ = signal::ctrl_c() => shutdown.await,
             _ = sigterm.recv() => shutdown.await
         };
-    });
-
-    let shard_manager = client.shard_manager.clone();
-    tokio::spawn(async move {
-        loop {
-            tokio::time::sleep(Duration::from_secs(12 * 60 * 60)).await;
-            let shards: Vec<ShardId> = shard_manager.runners.lock().await.keys().cloned().collect();
-            for shard in shards {
-                log::debug!("Restarting shard {}", shard);
-                shard_manager.restart(shard).await;
-            }
-        }
     });
 
     if let Err(err) = client.start().await {
