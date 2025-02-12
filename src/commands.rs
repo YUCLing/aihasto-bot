@@ -14,6 +14,7 @@ pub fn build_commands() -> Vec<Command<Data, Error>> {
         manage::sman(),
         moderation::slowmode(),
         moderation::inspect(),
+        moderation::context_menu_inspect(),
         moderation::warning(),
         moderation::warning_with_interaction(),
         moderation::flood(),

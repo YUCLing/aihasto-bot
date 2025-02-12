@@ -3,19 +3,16 @@ use std::str::FromStr;
 use diesel::{
     update, ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl, SelectableHelper,
 };
-use poise::{Context as PoiseContext, CreateReply};
+use poise::Context as PoiseContext;
 use serenity::all::{
-    ChannelId, Colour, CreateActionRow, CreateEmbed, CreateInputText, CreateInteractionResponse,
-    CreateMessage, CreateModal, EditChannel, EditMessage, Member, MessageId, User,
+    ChannelId, CreateActionRow, CreateInputText, CreateInteractionResponse, CreateMessage,
+    CreateModal, EditChannel, EditMessage, Member, MessageId, User,
 };
 use uuid::Uuid;
 
 use crate::{
-    features::moderation::{flood_impl, warning_impl},
-    models::{
-        guild_settings::GuildSettings,
-        moderation_log::{ModerationAction, ModerationLog},
-    },
+    features::moderation::{flood_impl, inspect_impl, warning_impl},
+    models::{guild_settings::GuildSettings, moderation_log::ModerationLog},
     util::parse_duration_to_seconds,
     Context, Error,
 };
@@ -72,8 +69,20 @@ pub async fn slowmode(
 
 /// Inspect a user
 #[poise::command(
-    slash_command,
     context_menu_command = "Inspect",
+    guild_only,
+    ephemeral,
+    default_member_permissions = "MUTE_MEMBERS"
+)]
+pub async fn context_menu_inspect(cx: Context<'_>, user: User) -> Result<(), Error> {
+    cx.send(inspect_impl::<&str>(&cx.data().database, user, None).await?)
+        .await?;
+    Ok(())
+}
+
+/// Inspect a user
+#[poise::command(
+    slash_command,
     guild_only,
     ephemeral,
     default_member_permissions = "MUTE_MEMBERS"
@@ -81,72 +90,11 @@ pub async fn slowmode(
 pub async fn inspect(
     cx: Context<'_>,
     #[description = "The user to be inspected"] user: User,
+    #[description = "Filter of the moderation kind"] filter: Option<String>,
 ) -> Result<(), Error> {
-    let mut warns = 0;
-    let mut floods = 0;
-    let mut timeouts = 0;
-    let mut bans = 0;
-    let logs: Vec<CreateEmbed> = {
-        let mut conn = cx.data().database.get()?;
-        for result in {
-            use crate::schema::moderation_log::*;
-            use diesel::dsl::*;
-            table
-                .filter(ModerationLog::by_user(user.clone()))
-                .group_by(kind)
-                .select((kind, count_star()))
-                .load::<(ModerationAction, i64)>(&mut conn)?
-        } {
-            match result.0 {
-                ModerationAction::Warning => warns = result.1,
-                ModerationAction::Flood => floods = result.1,
-                ModerationAction::Timeout => timeouts = result.1,
-                ModerationAction::Ban => bans = result.1,
-            }
-        }
-        ModerationLog::all()
-            .filter(ModerationLog::by_user(user.clone()))
-            .order_by(crate::schema::moderation_log::created_at.desc())
-            .limit(5)
-            .load::<ModerationLog>(&mut conn)?
-            .into_iter()
-            .map(|x| x.into())
-            .collect()
-    };
-    cx.send(CreateReply {
-        content: Some(format!("Moderation logs for <@{}>", user.id.get())),
-        embeds: [
-            vec![CreateEmbed::new()
-                .title("Summary of moderations")
-                .color(Colour::BLUE)
-                .fields([
-                    (
-                        ModerationAction::Warning.embed_title(),
-                        format!("{} time(s)", warns),
-                        true,
-                    ),
-                    (
-                        ModerationAction::Flood.embed_title(),
-                        format!("{} time(s)", floods),
-                        true,
-                    ),
-                    (
-                        ModerationAction::Timeout.embed_title(),
-                        format!("{} time(s)", timeouts),
-                        true,
-                    ),
-                    (
-                        ModerationAction::Ban.embed_title(),
-                        format!("{} time(s)", bans),
-                        true,
-                    ),
-                ])],
-            logs,
-        ]
-        .concat(),
-        ..Default::default()
-    })
-    .await?;
+    println!("execute");
+    cx.send(inspect_impl(&cx.data().database, user, filter).await?)
+        .await?;
     Ok(())
 }
 
