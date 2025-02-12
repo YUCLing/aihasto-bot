@@ -13,7 +13,7 @@ pub async fn softban(_cx: Context<'_>) -> Result<(), Error> {
 #[poise::command(slash_command, ephemeral)]
 pub async fn setup_permissions(cx: Context<'_>) -> Result<(), Error> {
     let guild_id = cx.guild_id().unwrap();
-    let Some(role) = GuildSettings::get(&mut cx.data().database.get()?, guild_id, "softban_role")
+    let Some(role) = GuildSettings::get(&cx.data().database, guild_id, "softban_role")
     else {
         return Ok(());
     };

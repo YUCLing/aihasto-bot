@@ -37,10 +37,10 @@ pub async fn set_server_id_impl<T: Into<u64>>(
 ) -> Result<String, Error> {
     Ok(if let Some(id) = id {
         let id = id.into();
-        GuildSettings::set(&mut pool.get()?, guild, key, Some(id.to_string()))?;
+        GuildSettings::set(pool, guild, key, Some(id.to_string()))?;
         format!("The {} has been set to <{}{}>", name, id_prefix, id)
     } else {
-        GuildSettings::set(&mut pool.get()?, guild, key, None::<String>)?;
+        GuildSettings::set(pool, guild, key, None::<String>)?;
         format!("The {} has been disabled.", name)
     })
 }
