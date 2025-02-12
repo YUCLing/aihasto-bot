@@ -11,6 +11,7 @@ git2 = { version = "0.20.0", default-features = false }
 
 [dependencies]
 chrono = "0.4.39"
+dashmap = "6.1.0"
 diesel = { version = "2.2.6", features = ["postgres", "r2d2", "chrono", "uuid"] }
 diesel_migrations = { version = "2.2.0", features = ["postgres"] }
 dotenvy = "0.15.7"
@@ -22,6 +23,6 @@ poise = "0.6.1"
 r2d2 = "0.8.10"
 sentry = { version = "0.36.0", features = ["backtrace", "contexts", "debug-images", "httpdate", "rustls", "panic", "reqwest", "sentry-backtrace", "sentry-contexts", "sentry-debug-images", "sentry-panic", "tokio"], default-features = false }
 serde = { version = "1.0.217", features = ["derive"] }
-serenity = "0.12.4"
-tokio = { version = "1.42.0", features = ["rt-multi-thread"] }
+serenity = { version = "0.12.4", features = ["simd_json"] }
+tokio = { version = "1.42.0", features = ["rt-multi-thread", "signal"] }
 uuid = "1.11.0"

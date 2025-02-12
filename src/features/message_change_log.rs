@@ -23,10 +23,7 @@ pub async fn handle_message_delete(
         return;
     };
     if let Some(log_channel) = GuildSettings::get(
-        &mut get_pool_from_serenity(&cx)
-            .await
-            .get()
-            .expect("Unable to get a database connection."),
+        &get_pool_from_serenity(&cx).await,
         guild_id,
         "message_change_log_channel",
     )
@@ -72,7 +69,9 @@ pub async fn handle_message_delete_bulk(
     guild_id: Option<GuildId>,
 ) {
     for msg in multiple_deleted_messages_ids {
-        handle_message_delete(cx.clone(), channel_id, msg, guild_id).await;
+        tokio::spawn(handle_message_delete(cx.clone(), channel_id, msg, guild_id))
+            .await
+            .unwrap();
     }
 }
 
@@ -110,10 +109,7 @@ pub async fn handle_message_update(
         return;
     };
     if let Some(log_channel) = GuildSettings::get(
-        &mut get_pool_from_serenity(&cx)
-            .await
-            .get()
-            .expect("Unable to get a database connection."),
+        &get_pool_from_serenity(&cx).await,
         guild_id,
         "message_change_log_channel",
     )
@@ -127,6 +123,10 @@ pub async fn handle_message_update(
         let mut embed = CreateEmbed::new()
             .color(Colour::ORANGE)
             .title("Message Edited")
+            .url(format!(
+                "https://discord.com/channels/{}/{}/{}",
+                guild_id, msg.channel_id, msg.id
+            ))
             .fields([
                 ("User", format!("<@{}>", author.id), true),
                 ("Channel", format!("<#{}>", msg.channel_id), true),

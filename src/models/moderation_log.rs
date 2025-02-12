@@ -55,6 +55,20 @@ impl ModerationAction {
     }
 }
 
+impl TryFrom<String> for ModerationAction {
+    type Error = String;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "warning" => Ok(ModerationAction::Warning),
+            "flood" => Ok(ModerationAction::Flood),
+            "timeout" => Ok(ModerationAction::Timeout),
+            "ban" => Ok(ModerationAction::Ban),
+            x => Err(format!("Unknown variant {}", x)),
+        }
+    }
+}
+
 #[derive(Insertable)]
 #[diesel(table_name = crate::schema::moderation_log)]
 pub struct CreateModerationLog {
@@ -158,13 +172,8 @@ where
     String: FromSql<Text, DB>,
 {
     fn from_sql(bytes: <DB as Backend>::RawValue<'_>) -> diesel::deserialize::Result<Self> {
-        match String::from_sql(bytes)?.as_str() {
-            "warning" => Ok(ModerationAction::Warning),
-            "flood" => Ok(ModerationAction::Flood),
-            "timeout" => Ok(ModerationAction::Timeout),
-            "softban" => Ok(ModerationAction::Softban),
-            "ban" => Ok(ModerationAction::Ban),
-            x => Err(format!("Unknown variant {}", x).into()),
-        }
+        String::from_sql(bytes)?
+            .try_into()
+            .map_err(|x: String| x.into())
     }
 }

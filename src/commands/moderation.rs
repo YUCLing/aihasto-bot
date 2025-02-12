@@ -3,19 +3,16 @@ use std::str::FromStr;
 use diesel::{
     update, ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl, SelectableHelper,
 };
-use poise::{Context as PoiseContext, CreateReply};
+use poise::Context as PoiseContext;
 use serenity::all::{
-    ChannelId, Colour, CreateActionRow, CreateEmbed, CreateInputText, CreateInteractionResponse,
-    CreateMessage, CreateModal, EditChannel, EditMessage, Member, MessageId, User,
+    ChannelId, CreateActionRow, CreateInputText, CreateInteractionResponse, CreateMessage,
+    CreateModal, EditChannel, EditMessage, Member, MessageId, User,
 };
 use uuid::Uuid;
 
 use crate::{
-    features::moderation::{flood_impl, warning_impl},
-    models::{
-        guild_settings::GuildSettings,
-        moderation_log::{ModerationAction, ModerationLog},
-    },
+    features::moderation::{flood_impl, inspect_impl, warning_impl},
+    models::{guild_settings::GuildSettings, moderation_log::ModerationLog},
     util::parse_duration_to_seconds,
     Context, Error,
 };
@@ -72,87 +69,31 @@ pub async fn slowmode(
 
 /// Inspect a user
 #[poise::command(
-    slash_command,
     context_menu_command = "Inspect",
+    guild_only,
+    ephemeral,
+    default_member_permissions = "MUTE_MEMBERS"
+)]
+pub async fn context_menu_inspect(cx: Context<'_>, user: User) -> Result<(), Error> {
+    cx.send(inspect_impl::<&str>(&cx.data().database, user, None).await?)
+        .await?;
+    Ok(())
+}
+
+/// Inspect a user
+#[poise::command(
+    slash_command,
+    guild_only,
     ephemeral,
     default_member_permissions = "MUTE_MEMBERS"
 )]
 pub async fn inspect(
     cx: Context<'_>,
     #[description = "The user to be inspected"] user: User,
+    #[description = "Filter of the moderation kind"] filter: Option<String>,
 ) -> Result<(), Error> {
-    let mut warns = 0;
-    let mut floods = 0;
-    let mut timeouts = 0;
-    let mut softbans = 0;
-    let mut bans = 0;
-    let logs: Vec<CreateEmbed> = {
-        let mut conn = cx.data().database.get()?;
-        for result in {
-            use crate::schema::moderation_log::*;
-            use diesel::dsl::*;
-            table
-                .filter(ModerationLog::by_user(user.clone()))
-                .group_by(kind)
-                .select((kind, count_star()))
-                .load::<(ModerationAction, i64)>(&mut conn)?
-        } {
-            match result.0 {
-                ModerationAction::Warning => warns = result.1,
-                ModerationAction::Flood => floods = result.1,
-                ModerationAction::Timeout => timeouts = result.1,
-                ModerationAction::Softban => softbans = result.1,
-                ModerationAction::Ban => bans = result.1,
-            }
-        }
-        ModerationLog::all()
-            .filter(ModerationLog::by_user(user.clone()))
-            .order_by(crate::schema::moderation_log::created_at.desc())
-            .limit(5)
-            .load::<ModerationLog>(&mut conn)?
-            .into_iter()
-            .map(|x| x.into())
-            .collect()
-    };
-    cx.send(CreateReply {
-        content: Some(format!("Moderation logs for <@{}>", user.id.get())),
-        embeds: [
-            vec![CreateEmbed::new()
-                .title("Summary of moderations")
-                .color(Colour::BLUE)
-                .fields([
-                    (
-                        ModerationAction::Warning.embed_title(),
-                        format!("{} time(s)", warns),
-                        true,
-                    ),
-                    (
-                        ModerationAction::Flood.embed_title(),
-                        format!("{} time(s)", floods),
-                        true,
-                    ),
-                    (
-                        ModerationAction::Timeout.embed_title(),
-                        format!("{} time(s)", timeouts),
-                        true,
-                    ),
-                    (
-                        ModerationAction::Ban.embed_title(),
-                        format!("{} time(s)", softbans),
-                        true,
-                    ),
-                    (
-                        ModerationAction::Ban.embed_title(),
-                        format!("{} time(s)", bans),
-                        true,
-                    ),
-                ])],
-            logs,
-        ]
-        .concat(),
-        ..Default::default()
-    })
-    .await?;
+    cx.send(inspect_impl(&cx.data().database, user, filter).await?)
+        .await?;
     Ok(())
 }
 
@@ -185,6 +126,7 @@ pub async fn warning(
 
 #[poise::command(
     context_menu_command = "Warning",
+    guild_only,
     ephemeral,
     default_member_permissions = "MUTE_MEMBERS"
 )]
@@ -215,7 +157,12 @@ pub async fn warning_with_interaction(cx: Context<'_>, user: User) -> Result<(),
 }
 
 /// Make a user Flooder. Use in the channel where the user violates the rules.
-#[poise::command(slash_command, ephemeral, default_member_permissions = "MUTE_MEMBERS")]
+#[poise::command(
+    slash_command,
+    guild_only,
+    ephemeral,
+    default_member_permissions = "MUTE_MEMBERS"
+)]
 pub async fn flood(
     cx: Context<'_>,
     #[description = "User that gets the Flooder"] user: Member,
@@ -241,6 +188,7 @@ pub async fn flood(
 
 #[poise::command(
     context_menu_command = "Flood",
+    guild_only,
     ephemeral,
     default_member_permissions = "MUTE_MEMBERS"
 )]
@@ -338,29 +286,28 @@ pub async fn reason(
     new_reason: String,
 ) -> Result<(), Error> {
     use crate::schema::moderation_log::*;
-    let mut conn = cx.data().database.get()?;
+    let pool = &cx.data().database;
     let Some(log) = update(table)
         .filter(id.eq(Uuid::from_str(&case_id).map_err(|_| "Case ID is invalid.")?))
         .set((reason.eq(new_reason), updated_at.eq(diesel::dsl::now)))
         .returning(ModerationLog::as_returning())
-        .get_result(&mut conn)
+        .get_result(&mut pool.get()?)
         .optional()?
     else {
         cx.say("No case with provided ID found.").await?;
         return Ok(());
     };
     if let Some(channel) =
-        GuildSettings::get(&mut conn, cx.guild_id().unwrap(), "moderation_log_channel")
+        GuildSettings::get(pool, cx.guild_id().unwrap(), "moderation_log_channel")
     {
         let result: Option<(i64, i64, i64)> = {
             use crate::schema::moderation_log_message::*;
             table
                 .filter(log_id.eq(log.id))
                 .select((id, guild, channel))
-                .get_result(&mut conn)
+                .get_result(&mut pool.get()?)
                 .optional()?
         };
-        std::mem::drop(conn);
         let channel = ChannelId::new(channel.parse().unwrap());
         channel
             .send_message(
@@ -380,8 +327,6 @@ pub async fn reason(
                 },
             )
             .await?;
-    } else {
-        std::mem::drop(conn);
     }
     cx.say("Case has been updated.").await?;
     Ok(())

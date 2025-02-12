@@ -1,8 +1,10 @@
 use diesel::RunQueryDsl;
 use fang::{AsyncQueue, AsyncQueueable};
+use poise::CreateReply;
 use serenity::all::{
-    ActionRowComponent, CacheHttp, ChannelId, Context, CreateInteractionResponse,
-    CreateInteractionResponseMessage, Interaction, Member, RoleId, User, UserId,
+    ActionRowComponent, CacheHttp, ChannelId, Colour, Context, CreateEmbed,
+    CreateInteractionResponse, CreateInteractionResponseMessage, Interaction, Member, RoleId, User,
+    UserId,
 };
 
 use crate::{
@@ -19,6 +21,101 @@ use crate::{
 };
 
 use super::{moderation_dm::generate_dm_message, temp_role::RemoveTempRole};
+
+pub async fn inspect_impl<F>(
+    pool: &ConnectionPool,
+    user: User,
+    filter: Option<F>,
+) -> Result<CreateReply, Error>
+where
+    F: AsRef<str>,
+{
+    let mut warns = 0;
+    let mut floods = 0;
+    let mut timeouts = 0;
+    let mut softbans = 0;
+    let mut bans = 0;
+    let logs: Vec<CreateEmbed> = {
+        use diesel::dsl::*;
+        use diesel::ExpressionMethods;
+        use diesel::QueryDsl;
+        let mut conn = pool.get()?;
+        for result in {
+            use crate::schema::moderation_log::*;
+            table
+                .filter(ModerationLog::by_user(user.clone()))
+                .group_by(kind)
+                .select((kind, count_star()))
+                .load::<(ModerationAction, i64)>(&mut conn)?
+        } {
+            match result.0 {
+                ModerationAction::Warning => warns = result.1,
+                ModerationAction::Flood => floods = result.1,
+                ModerationAction::Timeout => timeouts = result.1,
+                ModerationAction::Softban => softbans = result.1,
+                ModerationAction::Ban => bans = result.1,
+            }
+        }
+        let mut query = ModerationLog::all().filter(ModerationLog::by_user(user.clone()));
+        if let Some(filter) = filter {
+            for str in filter.as_ref().split(",") {
+                let Ok(action): Result<ModerationAction, _> = str.trim().to_lowercase().try_into()
+                else {
+                    return Ok(CreateReply {
+                        content: Some(format!("Unknown filter: {}", str)),
+                        ..Default::default()
+                    });
+                };
+                query = query.filter(crate::schema::moderation_log::kind.eq(action));
+            }
+        }
+        query
+            .order_by(crate::schema::moderation_log::created_at.desc())
+            .limit(5)
+            .load::<ModerationLog>(&mut conn)?
+            .into_iter()
+            .map(|x| x.into())
+            .collect()
+    };
+    Ok(CreateReply {
+        content: Some(format!("Moderation logs for <@{}>", user.id.get())),
+        embeds: [
+            vec![CreateEmbed::new()
+                .title("Summary of moderations")
+                .color(Colour::BLUE)
+                .fields([
+                    (
+                        ModerationAction::Warning.embed_title(),
+                        format!("{} time(s)", warns),
+                        true,
+                    ),
+                    (
+                        ModerationAction::Flood.embed_title(),
+                        format!("{} time(s)", floods),
+                        true,
+                    ),
+                    (
+                        ModerationAction::Timeout.embed_title(),
+                        format!("{} time(s)", timeouts),
+                        true,
+                    ),
+                    (
+                        ModerationAction::Softban.embed_title(),
+                        format!("{} time(s)", softbans),
+                        true,
+                    ),
+                    (
+                        ModerationAction::Ban.embed_title(),
+                        format!("{} time(s)", bans),
+                        true,
+                    ),
+                ])],
+            logs,
+        ]
+        .concat(),
+        ..Default::default()
+    })
+}
 
 pub async fn warning_impl<T: CacheHttp>(
     cx: &T,
@@ -43,8 +140,7 @@ pub async fn warning_impl<T: CacheHttp>(
         .user
         .dm(&cx, generate_dm_message(&log, actor, Some(channel)))
         .await?;
-    if let Some(channel) = GuildSettings::get(&mut pool.get()?, guild_id, "moderation_log_channel")
-    {
+    if let Some(channel) = GuildSettings::get(pool, guild_id, "moderation_log_channel") {
         send_moderation_logs_with_database_records(
             pool,
             &cx,
@@ -76,7 +172,7 @@ pub async fn flood_impl<T: CacheHttp>(
         return Ok("Invalid duration".to_string());
     }
     let guild_id = member.guild_id;
-    let Some(flooder_role) = GuildSettings::get(&mut state.0.get()?, guild_id, "flooder_role")
+    let Some(flooder_role) = GuildSettings::get(state.0, guild_id, "flooder_role")
         .map(|x| RoleId::new(x.parse().unwrap()))
     else {
         return Ok("Flooder is disabled.".to_string());
@@ -117,9 +213,7 @@ pub async fn flood_impl<T: CacheHttp>(
         .user
         .dm(&cx, generate_dm_message(&log, actor, Some(channel)))
         .await?;
-    if let Some(channel) =
-        GuildSettings::get(&mut state.0.get()?, guild_id, "moderation_log_channel")
-    {
+    if let Some(channel) = GuildSettings::get(state.0, guild_id, "moderation_log_channel") {
         send_moderation_logs_with_database_records(
             state.0,
             &cx,

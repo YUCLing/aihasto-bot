@@ -68,11 +68,9 @@ pub async fn guild_audit_log_entry_create(cx: Context, entry: AuditLogEntry, gui
                                 )
                                 .await;
                         }
-                        if let Some(channel) = GuildSettings::get(
-                            &mut pool.get().unwrap(),
-                            guild_id,
-                            "moderation_log_channel",
-                        ) {
+                        if let Some(channel) =
+                            GuildSettings::get(&pool, guild_id, "moderation_log_channel")
+                        {
                             let channel = ChannelId::new(channel.parse().unwrap());
                             let _ = send_moderation_logs_with_database_records(
                                 &pool, &cx, guild_id, channel, logs,
@@ -95,9 +93,7 @@ pub async fn guild_audit_log_entry_create(cx: Context, entry: AuditLogEntry, gui
                 )])
                 .get_results(&mut pool.get().unwrap())
                 .expect("Unable to log ban.");
-            if let Some(channel) =
-                GuildSettings::get(&mut pool.get().unwrap(), guild_id, "moderation_log_channel")
-            {
+            if let Some(channel) = GuildSettings::get(&pool, guild_id, "moderation_log_channel") {
                 let channel = ChannelId::new(channel.parse().unwrap());
                 send_moderation_logs_with_database_records(&pool, &cx, guild_id, channel, logs)
                     .await

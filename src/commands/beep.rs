@@ -3,7 +3,7 @@ use serenity::all::CreateEmbed;
 
 use crate::{Context, Error};
 
-#[poise::command(prefix_command, aliases("info", "version"))]
+#[poise::command(prefix_command, dm_only, aliases("info", "version"))]
 pub async fn beep(cx: Context<'_>) -> Result<(), Error> {
     let current_user = cx.http().get_current_user().await?;
     cx.send(CreateReply {

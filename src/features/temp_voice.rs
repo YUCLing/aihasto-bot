@@ -66,7 +66,7 @@ pub async fn handle_voice_state_update(cx: Context, new: VoiceState) {
     if let Some(channel_id) = new.channel_id {
         let guild_id = new.guild_id.unwrap();
         let Some(guild_voice_creator) =
-            GuildSettings::get(&mut pool.get().unwrap(), guild_id, "creator_voice_channel")
+            GuildSettings::get(&pool, guild_id, "creator_voice_channel")
         else {
             return;
         };

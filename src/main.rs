@@ -1,4 +1,4 @@
-use std::{env, panic, sync::RwLock};
+use std::{env, panic, process, sync::RwLock, time::Duration};
 
 use commands::build_commands;
 use data::{CacheHttpHolder, ConnectionPoolKey, Data, QueueKey};
@@ -11,11 +11,17 @@ use logging::{log_framework_error, setup_logger, setup_panic_logger_hook};
 use poise::{FrameworkError, PrefixFrameworkOptions};
 use r2d2::{Pool, PooledConnection};
 use serenity::{all::GatewayIntents, Client};
+use tokio::signal;
+
+const DATABASE_POOL_SIZE: u32 = 24;
+const QUEUE_POOL_SIZE: u32 = 4;
+const QUEUE_WORKERS: u32 = 4;
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 type ConnManager = ConnectionManager<PgConnection>;
 type ConnectionPool = Pool<ConnManager>;
+#[allow(dead_code)]
 type Connection = PooledConnection<ConnManager>;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -48,6 +54,39 @@ async fn async_main() {
     let token = env::var("DISCORD_TOKEN").expect("Discord Bot token is required.");
     let db_url = env::var("DATABASE_URL").expect("Database URL is required.");
 
+    let manager = ConnectionManager::<PgConnection>::new(db_url.clone());
+    let pool = Pool::builder()
+        .max_size(
+            env::var("DATABASE_POOL_SIZE")
+                .ok()
+                .and_then(|x| x.parse().ok())
+                .unwrap_or(DATABASE_POOL_SIZE),
+        )
+        .build(manager)
+        .expect("Unable to create connection pool.");
+
+    {
+        let mut conn = pool.get().expect("Unable to get a database connection.");
+        conn.run_pending_migrations(MIGRATIONS)
+            .expect("Unable to migrate the database.");
+    }
+
+    log::info!("Database pool created.");
+
+    let mut queue = AsyncQueue::builder()
+        .uri(db_url)
+        .max_pool_size(
+            env::var("QUEUE_POOL_SIZE")
+                .ok()
+                .and_then(|x| x.parse().ok())
+                .unwrap_or(QUEUE_POOL_SIZE),
+        )
+        .build();
+
+    queue.connect().await.unwrap();
+
+    log::info!("Queue created.");
+
     let options = poise::FrameworkOptions::<_, Error> {
         commands: build_commands(),
         prefix_options: PrefixFrameworkOptions {
@@ -66,28 +105,6 @@ async fn async_main() {
         },
         ..Default::default()
     };
-
-    let manager = ConnectionManager::<PgConnection>::new(db_url.clone());
-    let pool = Pool::builder()
-        .build(manager)
-        .expect("Unable to create connection pool.");
-
-    {
-        let mut conn = pool.get().expect("Unable to get a database connection.");
-        conn.run_pending_migrations(MIGRATIONS)
-            .expect("Unable to migrate the database.");
-    }
-
-    log::info!("Database pool created.");
-
-    let mut queue = AsyncQueue::builder()
-        .uri(db_url)
-        .max_pool_size(4u32)
-        .build();
-
-    queue.connect().await.unwrap();
-
-    log::info!("Queue created.");
 
     let pool_clone = pool.clone();
     let queue_clone = queue.clone();
@@ -110,14 +127,29 @@ async fn async_main() {
         | GatewayIntents::GUILDS
         | GatewayIntents::GUILD_VOICE_STATES
         | GatewayIntents::GUILD_MODERATION
-        | GatewayIntents::GUILD_MESSAGES;
+        | GatewayIntents::GUILD_MESSAGES
+        | GatewayIntents::DIRECT_MESSAGES;
 
-    let queue_clone = queue.clone();
+    let mut worker_pool: AsyncWorkerPool<AsyncQueue> = AsyncWorkerPool::builder()
+        .number_of_workers(
+            env::var("QUEUE_WORKERS")
+                .ok()
+                .and_then(|x| x.parse().ok())
+                .unwrap_or(QUEUE_WORKERS),
+        )
+        .queue(queue.clone())
+        .build();
+    worker_pool.start().await;
+
+    log::info!("Queue workers started.");
+
+    log::info!("Starting bot...");
+
     let mut client = Client::builder(token, intents)
         .event_handler(Handler)
         .framework(framework)
         .type_map_insert::<ConnectionPoolKey>(pool)
-        .type_map_insert::<QueueKey>(queue_clone)
+        .type_map_insert::<QueueKey>(queue)
         .await
         .expect("Unable to create the client");
 
@@ -128,19 +160,33 @@ async fn async_main() {
 
     client.cache.set_max_messages(256);
 
-    let mut pool: AsyncWorkerPool<AsyncQueue> = AsyncWorkerPool::builder()
-        .number_of_workers(4u32)
-        .queue(queue)
-        .build();
-    pool.start().await;
-
-    log::info!("Queue workers started.");
-
-    log::info!("Starting bot...");
+    let shard_manager = client.shard_manager.clone();
+    tokio::spawn(async move {
+        let shutdown = async move {
+            log::info!("Shutting down...");
+            tokio::select! {
+                _ = async move {
+                    shard_manager.shutdown_all().await;
+                } => {},
+                _ = tokio::time::sleep(Duration::from_secs(5)) => {
+                    log::error!("Unable to gracefully shutdown in time.");
+                    process::exit(2);
+                }
+            }
+            process::exit(0);
+        };
+        let mut sigterm = signal::unix::signal(signal::unix::SignalKind::terminate()).unwrap();
+        tokio::select! {
+            _ = signal::ctrl_c() => shutdown.await,
+            _ = sigterm.recv() => shutdown.await
+        };
+    });
 
     if let Err(err) = client.start().await {
         log::error!("Client error: {err:?}");
     }
+
+    process::exit(1);
 }
 
 fn main() {
