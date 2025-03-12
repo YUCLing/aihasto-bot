@@ -27,7 +27,7 @@ impl EventHandler for Handler {
                 .unwrap_or(ready.user.name.clone())
         );
         cx.set_presence(
-            Some(ActivityData::playing("Catridges")),
+            Some(ActivityData::playing("Cartridges")),
             serenity::all::OnlineStatus::DoNotDisturb,
         );
     }
