@@ -1,6 +1,6 @@
 use serenity::all::{
-    Attachment, ChannelId, Colour, Context, CreateEmbed, CreateEmbedFooter, CreateMessage, GuildId,
-    Message, MessageId, MessageUpdateEvent,
+    ChannelId, Colour, Context, CreateEmbed, CreateEmbedFooter, CreateMessage, GuildId, Message,
+    MessageId, MessageUpdateEvent, StickerFormatType,
 };
 
 use crate::{models::guild_settings::GuildSettings, util::get_pool_from_serenity};
@@ -57,6 +57,24 @@ pub async fn handle_message_delete(
             );
             footer.push("Attachments may already deleted by Discord.".to_string());
         }
+        if !cached_msg.sticker_items.is_empty() {
+            embed = embed.field(
+                "Stickers",
+                cached_msg
+                    .sticker_items
+                    .iter()
+                    .map(|x| {
+                        if matches!(x.format_type, StickerFormatType::Unknown(_)) {
+                            "_Unknown Sticker_".to_string()
+                        } else {
+                            x.image_url().unwrap()
+                        }
+                    })
+                    .collect::<Vec<String>>()
+                    .join("\n"),
+                false,
+            )
+        }
         embed = embed.footer(CreateEmbedFooter::new(footer.join(" • ")));
         tokio::spawn(log_channel.send_message(cx.clone(), CreateMessage::new().embed(embed)));
     }
@@ -75,11 +93,15 @@ pub async fn handle_message_delete_bulk(
     }
 }
 
-fn find_attachments_diff(old: Vec<Attachment>, new: Vec<Attachment>) -> Vec<Attachment> {
+fn find_attachments_diff<T, F>(old: Vec<T>, new: Vec<T>, comparer: F) -> Vec<T>
+where
+    T: Clone,
+    F: Fn(&T, &T) -> bool,
+{
     let mut diff_elements = Vec::new();
 
     for item1 in &old {
-        if new.iter().all(|item2| item1.id != item2.id) {
+        if new.iter().all(|x| !comparer(item1, x)) {
             diff_elements.push(item1.clone());
         }
     }
@@ -118,7 +140,14 @@ pub async fn handle_message_update(
         let author = event
             .author
             .expect("Why an edited message doesn't have an author.");
-        let removed_attachments = find_attachments_diff(old_message.attachments, msg.attachments);
+        let removed_attachments =
+            find_attachments_diff(old_message.attachments, msg.attachments, |a, b| {
+                a.id == b.id
+            });
+        let removed_stickers =
+            find_attachments_diff(old_message.sticker_items, msg.sticker_items, |a, b| {
+                a.id == b.id
+            });
         let mut footer = vec![format!("ID: {}", msg.id)];
         let mut embed = CreateEmbed::new()
             .color(Colour::ORANGE)
@@ -159,6 +188,23 @@ pub async fn handle_message_update(
                 false,
             );
             footer.push("Attachments may already deleted by Discord.".to_string());
+        }
+        if !removed_stickers.is_empty() {
+            embed = embed.field(
+                "Stickers",
+                removed_stickers
+                    .iter()
+                    .map(|x| {
+                        if matches!(x.format_type, StickerFormatType::Unknown(_)) {
+                            "_Unknown Sticker_".to_string()
+                        } else {
+                            x.image_url().unwrap()
+                        }
+                    })
+                    .collect::<Vec<String>>()
+                    .join("\n"),
+                false,
+            )
         }
         embed = embed.footer(CreateEmbedFooter::new(footer.join(" • ")));
         log_channel

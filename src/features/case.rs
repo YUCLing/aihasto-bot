@@ -1,15 +1,10 @@
 use std::str::FromStr;
 
-use diesel::{
-    delete as diesel_delete, ExpressionMethods, OptionalExtension, RunQueryDsl,
-};
+use diesel::{delete as diesel_delete, ExpressionMethods, OptionalExtension, RunQueryDsl};
 use serenity::all::{CacheHttp, ChannelId, MessageId};
 use uuid::Uuid;
 
-use crate::{
-    acquire_cache_http,
-    ConnectionPool, Error,
-};
+use crate::{acquire_cache_http, ConnectionPool, Error};
 
 pub async fn delete_impl<T>(pool: &ConnectionPool, case_id: T) -> Result<String, Error>
 where

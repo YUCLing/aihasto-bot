@@ -292,7 +292,10 @@ pub async fn softban(
     ephemeral,
     default_member_permissions = "MUTE_MEMBERS"
 )]
-pub async fn unsoftban(cx: Context<'_>, #[description = "User that will be unsoftbanned."] user: Member) -> Result<(), Error> {
+pub async fn unsoftban(
+    cx: Context<'_>,
+    #[description = "User that will be unsoftbanned."] user: Member,
+) -> Result<(), Error> {
     let Some(softban_role) =
         GuildSettings::get(&cx.data().database, cx.guild_id().unwrap(), "softban_role")
             .map(|x| RoleId::new(x.parse().unwrap()))
